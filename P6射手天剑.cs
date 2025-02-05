@@ -141,7 +141,7 @@ public class P6射手天剑
         var offset5 = 7.5f;
         var delayMode = arrowMode < 1 ? 4000 : 2000;
         var delayModeTN = arrowMode < 1 && myindex < 4 ? 2000 : 0;
-        accessory.Method.TextInfo($"{arrowMode}_{delayMode}_{delayModeTN}", duration: 5000, true);
+        // accessory.Method.TextInfo($"{arrowMode}_{delayMode}_{delayModeTN}", duration: 5000, true);
         
         Vector3 dealpos0 = default; // 起跑点
         
