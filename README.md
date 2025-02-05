@@ -1,1 +1,1 @@
-- Use this link: `https://github.com/Meedvast/KDA-Script/raw/refs/heads/main/OnlineRepo.json`
+- Use this link: `https://raw.githubusercontent.com/Meedvast/KDA-Script/refs/heads/main/OnlineRepo.json`
