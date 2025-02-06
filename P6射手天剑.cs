@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent.Struct;
@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.1", author: "Meva", note: noteStr)]
+    version: "0.0.0.2", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -36,7 +36,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.1:
+        v0.0.0.2:
         """;
     
     public void Init(ScriptAccessory accessory)
@@ -270,8 +270,10 @@ public class P6射手天剑
             dp.TargetPosition = dealpos2;
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultDangerColor;
-            dp.DestoryAt = 11500;
+            dp.Delay = 7500;
+            dp.DestoryAt = 4000;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_3";
@@ -294,8 +296,10 @@ public class P6射手天剑
             dp.TargetPosition = dealpos3;
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultDangerColor;
-            dp.DestoryAt = 13500 + delayModeTN;
+            dp.Delay = 11500;
+            dp.DestoryAt = 2000 + delayModeTN;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_4";
@@ -317,8 +321,10 @@ public class P6射手天剑
             dp.TargetPosition = dealpos4;
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultDangerColor;
-            dp.DestoryAt = 13500 + delayMode;
+            dp.Delay = 13500;
+            dp.DestoryAt = delayMode;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_5";
