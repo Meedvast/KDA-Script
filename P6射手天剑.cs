@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.2", author: "Meva", note: noteStr)]
+    version: "0.0.0.3", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -36,7 +36,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.2:
+        v0.0.0.3
         """;
     
     public void Init(ScriptAccessory accessory)
@@ -188,18 +188,14 @@ public class P6射手天剑
         };
         dealpos2 = myindex switch
         {
-            // MT和D3（基准坐标）
-            0 or 6 => coordinate2,
-            
-            // ST和D4
-            1 or 7 => new Vector3(coordinate2.X + offset3, 0, coordinate2.Z),
-            
-            // H1和D1
-            2 or 4 => new Vector3(coordinate2.X, 0, coordinate2.Z + offset3),
-            
-            // H2和D2
-            3 or 5 => new Vector3(coordinate2.X + offset3, 0, coordinate2.Z + offset3),
-                
+            0 => arrowMode < 1 ? new Vector3(94.0f, 0, 90.0f) : coordinate2,
+            1 => arrowMode < 1 ? new Vector3(110.0f, 0, 94.0f) : new Vector3(coordinate2.X + offset3, 0, coordinate2.Z),
+            2 => arrowMode < 1 ? new Vector3(90.0f, 0, 106.0f) : new Vector3(coordinate2.X, 0, coordinate2.Z + offset3),
+            3 => arrowMode < 1 ? new Vector3(106f, 0, 110.0f) : new Vector3(coordinate2.X + offset3, 0, coordinate2.Z + offset3),
+            6 => coordinate2,
+            7 => new Vector3(coordinate2.X + offset3, 0, coordinate2.Z),
+            4 => new Vector3(coordinate2.X, 0, coordinate2.Z + offset3),
+            5 => new Vector3(coordinate2.X + offset3, 0, coordinate2.Z + offset3),
             _ => default
         };
         dealpos3 = myindex switch
