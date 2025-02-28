@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.3", author: "Meva", note: noteStr)]
+    version: "0.0.0.4", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -27,22 +27,27 @@ public class P6射手天剑
     
     [UserSetting("天剑颜色")]
     public ScriptColor ArrorColor { get; set; } = new() { V4 = new(1, 0, 0, 1) };
-    private Vector3 MapCenter = new(100, 0, 100);
-    public int ArrowNum = 0;
-    public bool isSet = false;
+    private Vector3 MapCenter = new(100.0f, 0.0f, 100.0f);
+    private int ArrowNum = 0;
+    private int CannonNum = 0;
+    public Vector3[] StepCannon = new Vector3[4];
+    public int StepCannonIndex = 0;
+    private bool isSet = false;
     // 0为先十字，1为先外圈
     public int arrowMode = -1;
     const string InOut = "InOut";
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.3
+        v0.0.0.4
         """;
     
     public void Init(ScriptAccessory accessory)
     {
         arrowMode = -1;
         ArrowNum = 0;
+        CannonNum = 0;
+        StepCannonIndex = 0;
         accessory.Method.RemoveDraw(".*");
     }
 
@@ -333,6 +338,88 @@ public class P6射手天剑
             dp.DestoryAt = 2000;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
+    }
+    
+    [ScriptMethod(name: "地火8方指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31663"], userControl: true)]
+    public void 地火计数(Event @event, ScriptAccessory accessory)
+    {
+        CannonNum++;
+        if (CannonNum == 48)
+        {
+            var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+            var pos = myindex switch
+            {
+                0 => new Vector3(99.97f, -0.00f, 86.97f),
+                1 => new Vector3(113.15f, -0.00f, 100.07f),
+                2 => new Vector3(86.91f, 0.00f, 100.03f),
+                3 => new Vector3(100.04f, -0.00f, 112.89f),
+                4 => new Vector3(90.66f, -0.00f, 109.15f),
+                5 => new Vector3(109.40f, -0.00f, 109.29f),
+                6 => new Vector3(90.67f, 0.00f, 90.78f),
+                7 => new Vector3(109.47f, 0.00f, 90.83f),
+                _ => default
+            };
+            
+            var dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P6一地火8方";
+            dp.Scale = new(2);
+            dp.Owner = accessory.Data.Me;
+            dp.TargetPosition = pos;
+            dp.ScaleMode |= ScaleMode.YByDistance;
+            dp.Color = accessory.Data.DefaultSafeColor;
+            dp.DestoryAt = 8000;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+    }
+    
+    
+    
+    [ScriptMethod(name: "步进式地火计数", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31661"], userControl: false)]
+    public void 步进式地火计数(Event @event, ScriptAccessory accessory)
+    {
+        var pos = @event.SourcePosition();
+        StepCannon[(StepCannonIndex++)%4] = pos;
+    }
+    
+    [ScriptMethod(name: "步进式地火指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31660"], userControl: true)]
+    public void 步进式地火指路(Event @event, ScriptAccessory accessory)
+    {
+        
+        var c1 = StepCannon[0];
+        var c2 = StepCannon[1];
+        float a = (MathF.Atan2(c1.X - 100, c1.Z - 100) - MathF.Atan2(c2.X - 100, c2.Z - 100)) / float.Pi * 180;
+        if (a>180) a=a-360;
+        if (a<-180) a=a+360;
+        var c1e = new Vector3((c1.X - 100) / 24 * 18 + 100, 0, (c1.Z - 100) / 24 * 18 + 100);
+        
+        var end = RotatePointFromCentre(c1e, MapCenter, a*-1.5f);
+        
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = "P6地火起跑位置";
+        dp.Scale = new(2);
+        dp.Owner = accessory.Data.Me;
+        dp.TargetPosition = end;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = accessory.Data.DefaultSafeColor;
+        dp.DestoryAt = 9000;
+        accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+    }
+
+    private static Vector3 RotatePointFromCentre(Vector3 point, Vector3 centre, float angleDegrees)
+    {
+        float dx = point.X - centre.X;
+        float dz = point.Z - centre.Z;
+        float thetaRad = MathF.Atan2(dx, dz);
+        float normalizedAngle = (1f - (thetaRad / MathF.PI)) % 2f;
+        if (normalizedAngle < 0) normalizedAngle += 2f;
+        float baseRotation = normalizedAngle * 180f;
+        float totalRotation = (baseRotation + angleDegrees) * MathF.PI / 180f;
+        float distance = MathF.Sqrt(dx * dx + dz * dz);
+        return new Vector3(
+            centre.X + MathF.Sin(totalRotation) * distance,
+            0f, 
+            centre.Z - MathF.Cos(totalRotation) * distance 
+        );
     }
 }
 
