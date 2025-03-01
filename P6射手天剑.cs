@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.6", author: "Meva", note: noteStr)]
+    version: "0.0.0.7", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -40,7 +40,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.6
+        v0.0.0.7
         """;
     
     public void Init(ScriptAccessory accessory)
@@ -66,7 +66,7 @@ public class P6射手天剑
         isSet = false;
     }
 
-    [ScriptMethod(name: "宇宙天箭", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31651"])]
+    [ScriptMethod(name: "宇宙天箭", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31651"], userControl: false)]
     public void 宇宙天箭(Event @event, ScriptAccessory accessory)
     {
         var casterPos = @event.SourcePosition();
