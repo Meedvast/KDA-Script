@@ -35,7 +35,7 @@ public class P6射手天剑
     private bool isSet = false;
     // 0为先十字，1为先外圈
     public int arrowMode = -1;
-	public int parse = 0;
+    public int parse = 0;
     const string InOut = "InOut";
     const string OutIn = "OutIn";
     const string noteStr =
@@ -45,7 +45,7 @@ public class P6射手天剑
     
     public void Init(ScriptAccessory accessory)
     {
-		parse = 0;
+	parse = 0;
         arrowMode = -1;
         ArrowNum = 0;
         CannonNum = 0;
@@ -53,8 +53,7 @@ public class P6射手天剑
         accessory.Method.RemoveDraw(".*");
     }
 
-
-	[ScriptMethod(name: "P6转场记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31649"], userControl: false)]
+    [ScriptMethod(name: "P6转场记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31649"], userControl: false)]
     public void P6转场记录(Event @event, ScriptAccessory accessory)
     {
         parse = 6;
@@ -431,12 +430,12 @@ public class P6射手天剑
         );
     }
 	
-	[ScriptMethod(name: "陨石核爆点名", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:015A"], userControl: true)]
+    [ScriptMethod(name: "陨石核爆点名", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:015A"], userControl: true)]
     public void 陨石核爆点名(Event @event, ScriptAccessory accessory)
     {
-		if (parse != 6 || @event.TargetId() == 0) return;
-		var tid = @event.TargetId();
-		var dp = accessory.Data.GetDefaultDrawProperties();
+	if (parse != 6 || @event.TargetId() == 0) return;
+	var tid = @event.TargetId();
+	var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "P6陨石核爆点名";
         dp.Scale = new(20);
         dp.Owner = tid;
