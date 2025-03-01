@@ -45,7 +45,7 @@ public class P6射手天剑
     
     public void Init(ScriptAccessory accessory)
     {
-	parse = 0;
+	    parse = 0;
         arrowMode = -1;
         ArrowNum = 0;
         CannonNum = 0;
@@ -433,9 +433,9 @@ public class P6射手天剑
     [ScriptMethod(name: "陨石核爆点名", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:015A"], userControl: true)]
     public void 陨石核爆点名(Event @event, ScriptAccessory accessory)
     {
-	if (parse != 6 || @event.TargetId() == 0) return;
-	var tid = @event.TargetId();
-	var dp = accessory.Data.GetDefaultDrawProperties();
+	    if (parse != 6 || @event.TargetId() == 0) return;
+	    var tid = @event.TargetId();
+	    var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "P6陨石核爆点名";
         dp.Scale = new(20);
         dp.Owner = tid;
