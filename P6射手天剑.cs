@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.4", author: "Meva", note: noteStr)]
+    version: "0.0.0.5", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
