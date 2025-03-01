@@ -39,7 +39,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.4
+        v0.0.0.5
         """;
     
     public void Init(ScriptAccessory accessory)
