@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.4", author: "Meva", note: noteStr)]
+    version: "0.0.0.6", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -35,15 +35,17 @@ public class P6射手天剑
     private bool isSet = false;
     // 0为先十字，1为先外圈
     public int arrowMode = -1;
+	public int parse = 0;
     const string InOut = "InOut";
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.4
+        v0.0.0.6
         """;
     
     public void Init(ScriptAccessory accessory)
     {
+		parse = 0;
         arrowMode = -1;
         ArrowNum = 0;
         CannonNum = 0;
@@ -51,6 +53,13 @@ public class P6射手天剑
         accessory.Method.RemoveDraw(".*");
     }
 
+
+	[ScriptMethod(name: "P6转场记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31649"], userControl: false)]
+    public void P6转场记录(Event @event, ScriptAccessory accessory)
+    {
+        parse = 6;
+    }
+	
     [ScriptMethod(name: "宇宙天箭计数", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31650"], userControl: false)]
     public void 宇宙天箭计数(Event @event, ScriptAccessory accessory)
     {
@@ -425,7 +434,7 @@ public class P6射手天剑
 	[ScriptMethod(name: "陨石核爆点名", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:015A"], userControl: true)]
     public void 陨石核爆点名(Event @event, ScriptAccessory accessory)
     {
-		if (@event.TargetId() == 0) return;
+		if (parse != 6 || @event.TargetId() == 0) return;
 		var tid = @event.TargetId();
 		var dp = accessory.Data.GetDefaultDrawProperties();
         dp.Name = "P6陨石核爆点名";
