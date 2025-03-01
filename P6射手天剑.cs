@@ -57,6 +57,7 @@ public class P6射手天剑
         ArrowNum++;
         isSet = false;
     }
+
     [ScriptMethod(name: "宇宙天箭", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31651"])]
     public void 宇宙天箭(Event @event, ScriptAccessory accessory)
     {
@@ -103,6 +104,7 @@ public class P6射手天剑
             }
         }
     }
+
     private void GenerateLine(ScriptAccessory accessory, Vector3 origin, Vector2 direction, int steps, string pos)
     {
         for (int i = 0; i < steps; i++)
@@ -372,8 +374,6 @@ public class P6射手天剑
         }
     }
     
-    
-    
     [ScriptMethod(name: "步进式地火计数", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31661"], userControl: false)]
     public void 步进式地火计数(Event @event, ScriptAccessory accessory)
     {
@@ -420,6 +420,20 @@ public class P6射手天剑
             0f, 
             centre.Z - MathF.Cos(totalRotation) * distance 
         );
+    }
+	
+	[ScriptMethod(name: "陨石核爆点名", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:015A"], userControl: true)]
+    public void 陨石核爆点名(Event @event, ScriptAccessory accessory)
+    {
+		if (@event.TargetId() == 0) return;
+		var tid = @event.TargetId();
+		var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = "P6陨石核爆点名";
+        dp.Scale = new(20);
+        dp.Owner = tid;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.DestoryAt = 8000;
+        accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp);
     }
 }
 
