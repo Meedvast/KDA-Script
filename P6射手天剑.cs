@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.7", author: "Meva", note: noteStr)]
+    version: "0.0.0.8", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -27,6 +27,8 @@ public class P6射手天剑
     
     [UserSetting("天剑颜色")]
     public ScriptColor ArrorColor { get; set; } = new() { V4 = new(1, 0, 0, 1) };
+	[UserSetting("一天剑跟随人群")]
+	public bool followCrowd { get; set; } = true;
     private Vector3 MapCenter = new(100.0f, 0.0f, 100.0f);
     private int ArrowNum = 0;
     private int CannonNum = 0;
@@ -40,7 +42,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.7
+        v0.0.0.8
         """;
     
     public void Init(ScriptAccessory accessory)
@@ -148,7 +150,15 @@ public class P6射手天剑
     public async void 宇宙天箭指路(Event @event, ScriptAccessory accessory)
     {
         await Task.Delay(500);
-        var myindex = ArrowNum < 1 ? 4 : accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+		var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+		if (followCrowd)
+		{
+			myindex = ArrowNum < 1 ? 4 : accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+		}
+		else
+		{
+			myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+		}
         int offset1 = arrowMode < 1 ? 13 : 17;
         int offset2 = arrowMode < 1 ? 7: 23;
         int offset3 = arrowMode < 1 ? 23 : 17;
