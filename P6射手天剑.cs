@@ -19,7 +19,7 @@ using ECommons.GameFunctions;
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.8", author: "Meva", note: noteStr)]
+    version: "0.0.0.9", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -29,6 +29,8 @@ public class P6射手天剑
     public ScriptColor ArrorColor { get; set; } = new() { V4 = new(1, 0, 0, 1) };
 	[UserSetting("一天剑跟随人群")]
 	public bool followCrowd { get; set; } = true;
+	[UserSetting("箭头粗细")]
+	public int ArrowScale { get; set; } = 1;
     private Vector3 MapCenter = new(100.0f, 0.0f, 100.0f);
     private int ArrowNum = 0;
     private int CannonNum = 0;
@@ -42,7 +44,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.8
+        v0.0.0.9
         """;
     
     public void Init(ScriptAccessory accessory)
@@ -251,7 +253,7 @@ public class P6射手天剑
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_预站位";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Owner = accessory.Data.Me;
             dp.TargetPosition = dealpos0;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -263,7 +265,7 @@ public class P6射手天剑
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_1-2";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Position = dealpos0;
             dp.TargetPosition = dealpos1;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -273,7 +275,7 @@ public class P6射手天剑
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_2";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Owner = accessory.Data.Me;
             dp.TargetPosition = dealpos1;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -286,7 +288,7 @@ public class P6射手天剑
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_2-3";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Position = dealpos1;
             dp.TargetPosition = dealpos2;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -298,7 +300,7 @@ public class P6射手天剑
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_3";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Owner = accessory.Data.Me;
             dp.TargetPosition = dealpos2;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -312,7 +314,7 @@ public class P6射手天剑
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_3-4";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Position = dealpos2;
             dp.TargetPosition = dealpos3;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -324,7 +326,7 @@ public class P6射手天剑
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_4";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Owner = accessory.Data.Me;
             dp.TargetPosition = dealpos3;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -337,7 +339,7 @@ public class P6射手天剑
         {
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_4-5";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Position = dealpos3;
             dp.TargetPosition = dealpos4;
             dp.ScaleMode |= ScaleMode.YByDistance;
@@ -349,7 +351,7 @@ public class P6射手天剑
 
             dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6_射手天箭_5";
-            dp.Scale = new(1);
+            dp.Scale = new(ArrowScale);
             dp.Owner = accessory.Data.Me;
             dp.TargetPosition = dealpos4;
             dp.ScaleMode |= ScaleMode.YByDistance;

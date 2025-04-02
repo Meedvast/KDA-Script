@@ -2,10 +2,10 @@
   {
     "Name": "绝欧P6射手天箭脚本",
     "Guid": "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    "Version": "0.0.0.8",
+    "Version": "0.0.0.9",
     "Author": "Meva",
     "TerritoryIds": [1122],
     "DownloadUrl": "https://raw.githubusercontent.com/Meedvast/KDA-Script/refs/heads/main/P6%E5%B0%84%E6%89%8B%E5%A4%A9%E5%89%91.cs",
-    "UpdateInfo": "v0.0.0.8"
+    "UpdateInfo": "v0.0.0.9"
   }
 ]
