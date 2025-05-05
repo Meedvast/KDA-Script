@@ -15,11 +15,12 @@ using System.Xml.Linq;
 using Dalamud.Utility.Numerics;
 using Dalamud.Game.ClientState.Objects.Types;
 using ECommons.GameFunctions;
+using System.Threading.Tasks;
 
 namespace Meva.EndWalker.TheOmegaProtocol;
 
 [ScriptType(name: "欧米茄P6射手天剑", territorys: [1122], guid: "120df6f8-d8ce-44f7-9fb0-431eca0f2825",
-    version: "0.0.0.9", author: "Meva", note: noteStr)]
+    version: "0.0.0.10", author: "Meva", note: noteStr)]
 public class P6射手天剑
 {
     public enum Pattern { Unknown, InOut, OutIn }
@@ -37,6 +38,7 @@ public class P6射手天剑
     public Vector3[] StepCannon = new Vector3[4];
     public int StepCannonIndex = 0;
     private bool isSet = false;
+	System.Threading.AutoResetEvent ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
     // 0为先十字，1为先外圈
     public int arrowMode = -1;
     public int parse = 0;
@@ -44,7 +46,7 @@ public class P6射手天剑
     const string OutIn = "OutIn";
     const string noteStr =
         """
-        v0.0.0.9
+        v0.0.0.10
         """;
     
     public void Init(ScriptAccessory accessory)
@@ -54,6 +56,7 @@ public class P6射手天剑
         ArrowNum = 0;
         CannonNum = 0;
         StepCannonIndex = 0;
+		ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
         accessory.Method.RemoveDraw(".*");
     }
 
@@ -68,6 +71,7 @@ public class P6射手天剑
     {
         ArrowNum++;
         isSet = false;
+		ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
     }
 
     [ScriptMethod(name: "宇宙天箭", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31651"], userControl: false)]
@@ -85,6 +89,8 @@ public class P6射手天剑
             {
                 arrowMode = 0;
                 isSet = true;
+				System.Threading.Thread.MemoryBarrier();
+				ArrowModeConfirmed.Set();
             }
         }
         else if (Math.Abs(offset.Z) < 5) // 中央水平线
@@ -95,6 +101,8 @@ public class P6射手天剑
             {
                 arrowMode = 0;
                 isSet = true;
+				System.Threading.Thread.MemoryBarrier();
+				ArrowModeConfirmed.Set();
             }
         }
         else if (Math.Abs(offset.X) < 18) // 侧边垂直线
@@ -104,6 +112,8 @@ public class P6射手天剑
             {
                 arrowMode = 1;
                 isSet = true;
+				System.Threading.Thread.MemoryBarrier();
+				ArrowModeConfirmed.Set();
             }
         }
         else if (Math.Abs(offset.Z) < 18) // 侧边水平线
@@ -113,6 +123,8 @@ public class P6射手天剑
             {
                 arrowMode = 1;
                 isSet = true;
+				System.Threading.Thread.MemoryBarrier();
+				ArrowModeConfirmed.Set();
             }
         }
     }
@@ -148,10 +160,14 @@ public class P6射手天剑
         }
     }
 
-    [ScriptMethod(name: "宇宙天箭指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31650"])]
+    [ScriptMethod(name: "宇宙天箭指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31651"], suppress: 3000)]
     public async void 宇宙天箭指路(Event @event, ScriptAccessory accessory)
     {
-        await Task.Delay(500);
+        System.Threading.Thread.MemoryBarrier();
+		
+		ArrowModeConfirmed.WaitOne();
+		System.Threading.Thread.MemoryBarrier();
+
 		var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
 		if (followCrowd)
 		{
@@ -360,6 +376,7 @@ public class P6射手天剑
             dp.DestoryAt = 2000;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
+
     }
     
     [ScriptMethod(name: "地火8方指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31663"], userControl: true)]
