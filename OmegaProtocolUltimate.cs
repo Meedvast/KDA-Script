@@ -3,7 +3,9 @@ using KodakkuAssist.Module.GameEvent;
 using KodakkuAssist.Script;
 using KodakkuAssist.Module.GameEvent.Struct;
 using KodakkuAssist.Module.Draw;
-using System.Windows.Forms;
+using KodakkuAssist.Module.Draw.Manager;
+using KodakkuAssist.Data;
+// using System.Windows.Forms;
 using System.Threading;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -14,9 +16,10 @@ using System.Linq;
 using System.ComponentModel;
 using System.Xml.Linq;
 using Dalamud.Utility.Numerics;
-using Dalamud.Game.ClientState.Objects.Types;
+// using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
 using ECommons.GameFunctions;
+using ECommons.MathHelpers;
 using KodakkuAssist.Module.GameOperate;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 
@@ -111,8 +114,33 @@ namespace MyScriptNamespace
             Normal,
             Static
         }
+        
+        private enum TopPhase
+        {
+            Init,                   // 初始
+            P5A1_DeltaVersion,        // P5 一运
+            P5A2_DeltaWorld,          // P5 二传
+            P5B1_SigmaVersion,        // P5 二运
+            P5B2_SigmaWorld,          // P5 二传
+            P5C1_OmegaVersion,        // P5 三运
+            P5C2_OmegaWorldA,         // P5 三传
+            P5C3_OmegaWorldB,         // P5 四传
+            P5D_BlindFaith,          // P5 盲信
+        }
+        private static List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
+        private const bool Debugging = true;
+        private static readonly Vector3 Center = new Vector3(100, 0, 100);
+        private static TopPhase _phase = TopPhase.Init;
+        private volatile List<bool> _bools = new bool[20].ToList();
+        private List<int> _numbers = Enumerable.Repeat(0, 20).ToList();
+        private static List<ManualResetEvent> _events = Enumerable
+            .Range(0, 20)
+            .Select(_ => new ManualResetEvent(false))
+            .ToList();
+    
+        private static PriorityDict _pd = new PriorityDict();       // 灵活多用字典
 
-        public void Init(ScriptAccessory accessory)
+        public void Init(ScriptAccessory sa)
         {
             parse = 0;
             arrowMode = -1;
@@ -123,8 +151,25 @@ namespace MyScriptNamespace
             P52_OmegaFDirDone = false;
             P52_OmegaFDir = 0;
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
+<<<<<<< main
+            InitParams();
+            _phase = TopPhase.Init;
+            sa.Method.RemoveDraw(".*");
+=======
             accessory.Method.RemoveDraw(".*");
+>>>>>>> main
         }
+        
+        private void InitParams()
+        {
+            _bools = new bool[20].ToList();
+            _numbers = Enumerable.Repeat(0, 20).ToList();
+            _events = Enumerable
+                .Range(0, 20)
+                .Select(_ => new ManualResetEvent(false))
+                .ToList();
+        }
+        
         #region P1
         [ScriptMethod(name: "P1_循环程序_分P", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31491"],userControl:false)]
         public void P1_循环程序_分P(Event @event, ScriptAccessory accessory)
@@ -1621,12 +1666,709 @@ namespace MyScriptNamespace
             P51_Eye = 0;
             P51_Buff = [0, 0, 0, 0, 0, 0, 0, 0];
             P51_Fist = [0, 0, 0, 0];
+            
+            _phase = TopPhase.P5A1_DeltaVersion;
+            InitParams();
+            _pd.Init(accessory, "P5一运");
+            _pd.AddPriorities([0, 1, 2, 3, 4, 5, 6, 7]);    // 依职能顺序添加优先值
+            myArmUnitBiasEnable = false;
+            accessory.Log.Debug($"当前阶段为：{_phase}");
+        }
+        
+        [ScriptMethod(name: "一运 远线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:00C9"], userControl: Debugging)]
+        public void P5_Delta_LocalRemoteTetherRecord(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+
+            lock (_pd)
+            {
+                var targetId = ev.TargetId;
+                var targetIdx = sa.GetPlayerIdIndex((uint)targetId);
+                var sourceId = ev.SourceId;
+                var sourceIdx = sa.GetPlayerIdIndex((uint)sourceId);
+
+                var pdValMax = _pd.SelectSpecificPriorityIndex(0, true).Value;
+                _pd.AddPriority(targetIdx, pdValMax > 1000 ? 2000 : 1000);
+                _pd.AddPriority(sourceIdx, pdValMax > 1000 ? 2000 : 1000);
+                _events[2].Set();   // 远线搭档记录完毕
+            }
+        }
+        
+        [ScriptMethod(name: "一运 非指挥模式记录头标", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[123467])$"],
+            userControl: Debugging)]
+        public void P5_DeltaVersionReceiveMarker(Event ev, ScriptAccessory sa)
+        {
+            // 只取攻击1234与锁链12
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+        
+            lock (_pd)
+            {
+                var mark = ev.Id0();
+                sa.Log.Debug($"检测到ev.Id {mark}");
+                var tid = ev.TargetId;
+                var tidx = sa.GetPlayerIdIndex((uint)tid);
+            
+                _pd.AddActionCount();
+                var pdVal = mark switch
+                {
+                    1 => 10,    // 攻击1
+                    2 => 20,    // 攻击2
+                    3 => 30,    // 攻击3
+                    4 => 40,    // 攻击4
+                    6 => 100,   // 锁链1
+                    7 => 200,   // 锁链2
+                    _ => 0
+                };
+                _pd.AddPriority(tidx, pdVal);
+                if (_pd.ActionCount != 6) return;
+                sa.Log.Debug($"ev[0] 一运，非指挥模式头标记录完毕。");
+                sa.Log.Debug($"{_pd.ShowPriorities()}");
+                _events[0].Set();   // 头标记录
+            }
+        }
+        
+        [ScriptMethod(name: "一运 定位光头", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"],
+            userControl: Debugging)]
+        public void P5_DeltaVersionFindOmegaBald(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            var spos = ev.SourcePosition;
+            var dir = spos.Position2Dirs(Center, 4);
+            _numbers[0] = dir;              // 光头
+            _numbers[1] = (dir + 2) % 4;    // 蟑螂
+            _events[1].Set();   // 光头蟑螂定位
+            sa.Log.Debug($"ev[1] 光头位置：{_numbers[0]}，蟑螂位置：{_numbers[1]}记录完毕。");
+        } 
+        
+        [ScriptMethod(name: "一运 初始位置指路 *", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["SourceDataId:14669", "Id:7747"],
+        userControl: true)]
+        public void P5_DeltaVersionFirstGuidance(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            _events[0].WaitOne(5000);   // 触发判断时，若5000ms后仍未捕捉到Set信号，移除
+            _events[1].WaitOne(2000);
+            _events[2].WaitOne(2000);
+            
+            var myIndex = sa.GetMyIndex();
+            var myPdVal = _pd.Priorities[myIndex];
+            if (myPdVal > 1000 & myPdVal.GetDecimalDigit(3) == 0)
+            {
+                // 玩家需找到锁链1/锁链2搭档
+                // 锁链1的搭档，千位相同，百位为1。锁链2的搭档，千位相同，百位为2。
+                // 若myPdVal的千位为1，则自身为降序第4，找降序第3(index 2)为搭档
+                // 若myPdVal的千位为2，则自身为降序第2，找降序第1(index 0)为搭档
+                var myPartner = _pd.SelectSpecificPriorityIndex(myPdVal > 2000 ? 0 : 2, true);
+                sa.Log.Debug($"玩家远线无世界，找到远线搭档为 {sa.GetPlayerJobByIndex(myPartner.Key)}");
+                _pd.AddPriority(myIndex, myPartner.Value.GetDecimalDigit(3) * 100 + 10);  // 增加百位+10，如，对方是锁链2，则玩家+210
+                sa.Log.Debug($"{_pd.ShowPriorities()}");
+            }
+            
+            // 修订完毕后，将优先级值统一更改。
+            // 注，当且仅当玩家是Stop1/Stop2时才会标注出，否则为0。
+            for (int i = 0; i < 8; i++)
+            {
+                _pd.Priorities[i] = _pd.Priorities[i] % 1000 / 10;
+            }
+            sa.Log.Debug($"经矫正，{_pd.ShowPriorities()}");
+            
+            // var markerVal = myPdVal % 1000 / 10;  // 去掉千位与个位
+            var markerVal = _pd.Priorities[myIndex];
+            var omegaBaldDirection = _numbers[0];
+            var beetleDirection = _numbers[1];
+
+            Vector3 tpos1 = new(90f, 0, 94f);
+            Vector3 tpos2 = new(110f, 0, 94f);
+
+            tpos1 = markerVal switch
+            {
+                1 => tpos1.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
+                2 => tpos1.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
+                3 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                    beetleDirection),
+                4 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                    beetleDirection),
+                10 => tpos1.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+                11 => tpos1.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+                20 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center,
+                    90f.DegToRad() * omegaBaldDirection),
+                21 => (tpos1 - new Vector3(0, 0, 8)).RotatePoint(Center,
+                    90f.DegToRad() * omegaBaldDirection),
+                _ => new Vector3(100f, 0, 100f),
+            };
+
+            tpos2 = markerVal switch
+            {
+                1 => tpos2.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
+                2 => tpos2.RotatePoint(Center, 90f.DegToRad() * beetleDirection),
+                3 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                    beetleDirection),
+                4 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center, 90f.DegToRad() *
+                    beetleDirection),
+                10 => tpos2.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+                11 => tpos2.RotatePoint(Center, 90f.DegToRad() * omegaBaldDirection),
+                20 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center,
+                    90f.DegToRad() * omegaBaldDirection),
+                21 => (tpos2 - new Vector3(0, 0, 8)).RotatePoint(Center,
+                    90f.DegToRad() * omegaBaldDirection),
+                _ => new Vector3(100f, 0, 100f),
+            };
+
+            var dp = sa.DrawGuidance(tpos1, 0, 5000, $"一运待命地点1");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            dp = sa.DrawGuidance(tpos2, 0, 5000, $"一运待命地点2");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
+            _events[0].Reset();
+            _events[1].Reset();
+            _events[2].Reset();
+        }
+    
+        [ScriptMethod(name: "一运 记录拳头", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(157(09|10))$"], userControl: Debugging)]
+        public void P5_DeltaRocketPunchRecord(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            const uint blue = 15709;
+            var dataid = JsonConvert.DeserializeObject<uint>(ev["DataId"]);
+            var spos = ev.SourcePosition;
+            lock (_pd)
+            {
+                _pd.AddActionCount();
+                var myObj = sa.Data.MyObject;
+                if (myObj == null) return;
+                var a = myObj.Position;
+                // 拳头出现时，记录自己的四分之一半场
+                if (_pd.ActionCount == 7)
+                    _numbers[2] = myObj.Position.Position2Dirs(Center, 4, false);
+                if (spos.Position2Dirs(Center, 4, false) == _numbers[2])
+                {
+                    _numbers[3]++;      // 拳头数量
+                    _numbers[4] += dataid == blue ? 1 : -1; // 拳头颜色
+                    sa.Log.Debug($"捕捉到在玩家半场{_numbers[2]}出现了第{_numbers[3]}个拳头，为{(dataid == blue ? "蓝" : "黄")}色，记录值为{_numbers[4]}");
+                    // _dv.PunchCountAtMyQuadrant++;
+                    // _dv.PunchColorAtMyQuadrant += dataid == blue ? 1 : -1;
+                }
+
+                if (_pd.ActionCount == 14)  // 6个头标，8个拳头
+                {
+                    _events[3].Set();   // 拳头记录完毕
+                    sa.Method.RemoveDraw($"一运待命地点.*");
+                }
+            }
+        }
+    
+        [ScriptMethod(name: "一运 拳头待命指路 *", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:regex:^(157(09|10))$"],
+            userControl: true, suppress: 10000)]
+        public void P5_DeltaRocketPunchGuidance(Event ev, ScriptAccessory sa)
+        {
+            // var myIndex = accessory.GetMyIndex();
+            // var myMarker = MarkType.Attack3;    // 我的头标
+            //
+            // _dv.MyQuadrant = 3;                 // 我在待命时的象限
+            // _dv.PunchCountAtMyQuadrant = 3;     // 我在待命时，象限内拳头数量
+            // _dv.PunchColorAtMyQuadrant = 0;     // 0代表象限内拳头异色，2或-2代表象限内拳头同色
+            // _dv.OmegaBaldDirection = 2;         // 大光头的方位
+            
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            _events[3].WaitOne(2000);   //  拳头记录完毕
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex];
+            var isOutside = markerVal is 3 or 4 or 20 or 21;    // 攻3，攻4，锁2，禁2
+            var isRemoteTetherOutside = markerVal is 20 or 21;  // 锁2，禁2
+            
+            var omegaBaldDirection = _numbers[0];
+            var beetleDirection = _numbers[1];
+            var myQuadrant = _numbers[2];
+            var punchCountAtMyQuadrant= _numbers[3];
+            var punchColorAtMyQuadrant = _numbers[4];
+            
+            // 找到第0象限内，标点靠内。会随着boss位置的变化而出现偏移。
+            var tposOut = new Vector3(108.7f, 0f, 90f).RotatePoint(new Vector3(109.9f, 0f, 90.1f),
+                omegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);
+            var tposIn = new Vector3(102.7f, 0f, 90f).RotatePoint(new Vector3(109.9f, 0f, 90.1f),
+                omegaBaldDirection % 2 == 1 ? -90f.DegToRad() : 0);  // 外锁链
+
+            var tposBase = isRemoteTetherOutside ? tposIn : tposOut;
+            
+            tposBase = myQuadrant switch
+            {
+                1 => tposBase.FoldPointVertical(Center.Z),
+                2 => tposBase.FoldPointVertical(Center.Z).FoldPointHorizon(Center.X),
+                3 => tposBase.FoldPointHorizon(Center.X),
+                _ => tposBase,
+            };
+            
+            if (!isOutside)
+            {
+                // 此处的Outside是指标点是否偏大，靠场外。
+                // 若玩家靠场内，无脑站象限点。
+                
+                var dp = sa.DrawGuidance(tposBase, 0, 5000, $"一运拳头");
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+                sa.Log.Debug($"玩家靠场内，站第{myQuadrant}象限点。");
+            }
+            else
+            {
+                // 若玩家为外场
+                // 玩家所在象限拳头数量不为2，有人没预占位（可能有武士画家），需要自己观察，不作指路
+                if (punchCountAtMyQuadrant != 2)
+                {
+                    sa.Method.TextInfo($"观察同组拳头颜色是否交换。", 4000, true);
+                    sa.Log.Debug($"第{myQuadrant}象限内拳头数量错误，需自己观察。");
+                }
+                // 玩家所在象限拳头数量为2，且颜色值不为0，则拳头同色，需要换位。
+                else if (punchColorAtMyQuadrant != 0)
+                {
+                    var tpos = omegaBaldDirection % 2 == 1
+                        ? tposBase.FoldPointVertical(Center.Z)
+                        : tposBase.FoldPointHorizon(Center.X);
+                    var dp = sa.DrawGuidance(tpos, 0, 5000, $"一运拳头");
+                    sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+                    sa.Log.Debug($"玩家{myQuadrant}象限内拳头同色，需要换位。");
+                }
+                else
+                {
+                    // 无需换位，直接根据_dv.myQuadrant指向对应位置
+                    var dp = sa.DrawGuidance(tposBase, 0, 5000, $"一运拳头");
+                    sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+                    sa.Log.Debug($"玩家无需换位，站第{myQuadrant}象限点。");
+                }
+            }
+            
+            _events[3].Reset();
+        }
+    
+        [ScriptMethod(name: "一运 拳头旋转引导位置", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(009[CD])$"], userControl: true)]
+        public void P5_DeltaArmUnitRotate(Event ev, ScriptAccessory sa)
+        {
+            // uint id = 0x009C;
+            // uint tid = 0x4000C420;
+            // var tpos = IbcHelper.GetById(tid)?.Position ?? Center;
+            
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            var id = ev.Id0();
+            var tid = ev.TargetId;
+            var tpos = sa.GetById(tid)?.Position ?? Center;
+            
+            tpos = tpos.PointInOutside(Center, 1f);
+            // RotateCW = 156
+            var baitPos = tpos.RotatePoint(Center, id == 156 ? -5f.DegToRad() : 5f.DegToRad());
+            var dp = sa.DrawStaticCircle(baitPos, sa.Data.DefaultSafeColor.WithW(3f), 0, 10000, $"手臂单元转转", 0.5f);
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Circle, dp);
+        }
+    
+        private bool myArmUnitBiasEnable = false;
+        [ScriptMethod(name: "一运 玩家引导拳头指路 *", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31587"],
+            userControl: true)]
+        public void P5_DeltaMyArmUnitBiasGuidance(Event ev, ScriptAccessory sa)
+        {
+            // var myIndex = accessory.GetMyIndex();
+            // var myMarker = MarkType.Attack1;
+            // var myPos = new Vector3(90f, 0, 90f);
+            // _dv.OmegaBaldDirection = 2;
+            
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            // 这一条判断会因为suppress被return回去，所以suppress的使用场景需注意，事件确认可被触发。否则就用bool。
+            if (ev.TargetId != sa.Data.Me) return;
+            if (_bools[0]) return;  // 玩家引导拳头指路是否绘画完成
+            _bools[0] = true;
+            myArmUnitBiasEnable = true;
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex];
+            var myPos = ev.TargetPosition;
+            
+            var omegaBaldDirection = _numbers[0];
+            
+            var omegaBaldDirection12 = omegaBaldDirection * 3;
+            var omegaBaldPos = new Vector3(100, 0, 80).RotatePoint(Center, omegaBaldDirection12 * 30f.DegToRad());
+            
+            var isShieldTarget = markerVal is 10 or 11;     // 锁1，禁1，需往场中被盾击
+            var isOutside = markerVal is 3 or 4 or 20 or 21;    // 攻3，攻4，锁2，禁2，偏场外
+            var isAtRight = myPos.IsAtRight(omegaBaldPos, Center);
+            var isBind = markerVal is 10 or 20 or 11 or 21; // 锁1，锁2，禁1，禁2
+            
+            var val = 100 * (isOutside ? 1 : 0) + 10 * (isAtRight ? 1 : 0) + 1 * (isBind ? 1 : 0);
+            
+            // myArmUnit
+            _numbers[5] = val switch
+            {
+                111 => (omegaBaldDirection12 + 1) % 12,
+                110 => (omegaBaldDirection12 + 5) % 12,
+                101 => (omegaBaldDirection12 + 11) % 12,
+                100 => (omegaBaldDirection12 + 7) % 12,
+                10 => (omegaBaldDirection12 + 3) % 12,
+                0 => (omegaBaldDirection12 + 9) % 12,
+                
+                11 => (omegaBaldDirection12 + 3) % 12,
+                1 => (omegaBaldDirection12 + 9) % 12,
+                
+                _ => -1
+            };
+            var myArmUnit = _numbers[5];
+            
+            sa.Log.Debug(!isShieldTarget ? $"玩家所需引导手臂单元位于方位{myArmUnit}" : $"玩家需前往场中偏方位{myArmUnit}");
+            sa.Method.TextInfo($"同组靠内集合，等待黄圈", 2000);
+
+            if (!isShieldTarget)
+            {
+                sa.Log.Debug($"向引导拳头位置绘图");
+                var armUnitPos = new Vector3(100, 0, 84).RotatePoint(Center, myArmUnit * 30f.DegToRad());
+                var dp = sa.DrawGuidance(armUnitPos, 0, 4000, $"引导拳头指引", isSafe: false);
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            }
+            else
+            {
+                sa.Log.Debug($"向场中引导位置绘图");
+                var armUnitPos = new Vector3(100, 0, 95).RotatePoint(Center, myArmUnit * 30f.DegToRad());
+                var dp = sa.DrawGuidance(armUnitPos, 0, 4000, $"场中引导指引", isSafe: false);
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            }
+        }
+        
+        [ScriptMethod(name: "一运 玩家引导拳头指路刷新", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
+            userControl: Debugging, suppress: 10000)]
+        public void P5_DeltaMyArmUnitBiasRefresh(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            sa.Method.RemoveDraw($"引导拳头指引");
+            sa.Method.RemoveDraw($"场中引导指引");
+            
+            if (!myArmUnitBiasEnable) return;
+            
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex];
+            var isShieldTarget = markerVal is 10 or 11;
+            if (isShieldTarget) return;
+            
+            var myArmUnit = _numbers[5];
+            
+            sa.Log.Debug($"去引导拳头");
+            var armUnitPos = new Vector3(100, 0, 84).RotatePoint(Center, myArmUnit * 30f.DegToRad());
+            var dp = sa.DrawGuidance(armUnitPos, 0, 4000, $"引导拳头", isSafe: true);
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+        
+        [ScriptMethod(name: "一运 转转手引导指路删除", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31600"],
+            userControl: Debugging, suppress: 10000)]
+        public void P5_DeltaMyArmUnitBiasRemove(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            sa.Method.RemoveDraw($"引导拳头");
+        }
+        
+        [ScriptMethod(name: "一运 玩家场中盾引导指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31482"],
+            userControl: true, suppress: 10000)]
+        public void P5_DeltaOmegaCenterShieldBias(Event ev, ScriptAccessory sa)
+        {
+            // var myIndex = accessory.GetMyIndex();
+            // var myMarker = MarkType.Bind1;
+            // _dv.MyArmUnit = 3;  // only 0, 3, 6, 9
+            
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex];
+            
+            if (markerVal is not 10 and not 11) return;
+            var myArmUnit = _numbers[5];
+            
+            var centerBiasPos = new Vector3(100, 0, 95).RotatePoint(Center, myArmUnit * 30f.DegToRad());
+            var dp = sa.DrawGuidance(centerBiasPos, 0, 3000, $"场中盾连击引导");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+        
+        [ScriptMethod(name: "一运 转转手引导后近线待命指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31600"],
+            userControl: true, suppress: 10000)]
+        public void P5_DeltaAfterArmUnitBiasGuidance(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex];
+
+            if (markerVal is not 1 and not 2 and not 3 and not 4) return;
+            var myArmUnit = _numbers[5];
+        
+            var standByPos = new Vector3(100, 0, 86).
+                RotatePoint(Center, MathF.Round((float)myArmUnit * 2 / 3) * 45f.DegToRad());
+            var dp = sa.DrawGuidance(standByPos, 0, 6000, $"攻击头标标点待命");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+        }
+    
+        [ScriptMethod(name: "一运 光头左右扫描记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[89])$"],
+            userControl: Debugging)]
+        public void P5_DeltaOmegaBaldCannonRecord(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            const uint right = 31638;
+            _numbers[6] = ev.ActionId == right ? 1 : 2;
+            // var omegaBaldCannonType = _numbers[6]
+        }
+    
+        [ScriptMethod(name: "一运 玩家小电视Buff记录", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:regex:^(345[23])$"],
+            userControl: Debugging)]
+        public void P5_DeltaPlayerCannonRecord(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            _pd.AddPriority(tidx, 100);    // 小电视点名+100
+            // _dv.PlayerCannonSource = tidx;
+            const uint right = 3452;
+            _numbers[7] = ev.StatusId == right ? 1 : 2; // 右刀1，左刀2
+            // var playerCannonType = _numbers[7]
+            // _dv.PlayerCannonType = ev.StatusId == right ? 1 : 2;
+        }
+        
+        [ScriptMethod(name: "一运 盾连击目标记录", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31528"],
+        userControl: Debugging)]
+        public void P5_DeltaShieldTargetRecord(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            if (JsonConvert.DeserializeObject<uint>(ev["TargetIndex"]) != 1) return;
+            sa.Method.RemoveDraw($"场中盾连击引导");
+            
+            var tidx = sa.GetPlayerIdIndex((uint)ev.TargetId);
+            _pd.AddPriority(tidx, 1000);    // 盾连击目标+1000
+            // _dv.ShieldTarget = tidx;
+            // 盾连击是一运流程的最后一环
+            _events[4].Set();   // (int)RecordedIdx.ShieldTargetRecorded
+        }
+        
+        [ScriptMethod(name: "一运 分摊与小电视指路", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:31528"],
+            userControl: true)]
+        public void P5_DeltaStackAndCannonGuidance(Event ev, ScriptAccessory sa)
+        {
+            // var myIndex = accessory.GetMyIndex();
+            // var myMarker = MarkType.Bind2;
+            // _dv.PlayerCannonSource = myIndex;        // 小电视玩家Idx
+            // _dv.ShieldTarget = myIndex;              // 盾连击玩家Idx
+            // _dv.OmegaBaldDirection = 0;              // 光头位置
+            // _dv.OmegaBaldCannonType = 2;             // 光头电视1右2左
+            // _dv.PlayerCannonType = 1;                // 玩家电视1右2左
+            
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            _events[4].WaitOne(1000);
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex] % 100;  // 不需要知道百位数
+            var myPriVal = _pd.Priorities[myIndex];  // 不需要知道百位数
+            
+            if (markerVal is 1 or 2 or 3 or 4)
+            {
+                // 近线组不参与讨论
+                _events[4].Reset();
+                return;
+            }
+            
+            // 盾连击目标是否等于小电视目标，玩家是否为小电视目标
+            // 以光头在A，光头电视打右为基准，以光头为12点做旋转。
+            
+            // var isSameTarget = _dv.PlayerCannonSource == _dv.ShieldTarget;
+            var isSameTarget = _pd.SelectSpecificPriorityIndex(0, true).Value >= 1100;
+            
+            // 如果盾连击目标与小电视目标相同，盾连击目标需往外一步，分摊目标需往内一步
+            var shieldTargetPos = new Vector3(101, 0, 85) + (isSameTarget ? new Vector3(3.5f, 0, 0) : new Vector3(0, 0, 0));
+            var stackPos = new Vector3(101, 0, 100) + (isSameTarget ? new Vector3(0, 0, 0) : new Vector3(3.5f, 0, 0));
+
+            var omegaBaldDirection = _numbers[0];
+            var omegaBaldCannonType = _numbers[6];
+            var playerCannonType = _numbers[7];
+                
+            // _dv.OmegaBaldCannonType 1右2左
+            if (omegaBaldCannonType == 2)
+            {
+                // 左刀则折叠后再旋转
+                shieldTargetPos = shieldTargetPos.FoldPointHorizon(Center.X);
+                stackPos = stackPos.FoldPointHorizon(Center.X);
+            }
+            
+            var rotateRad = omegaBaldDirection * 90f.DegToRad();
+            shieldTargetPos = shieldTargetPos.RotatePoint(Center, rotateRad);
+            stackPos = stackPos.RotatePoint(Center, rotateRad);
+
+            if (myPriVal / 1000 == 1)   // >1000，盾连击目标
+            {
+                var dp = sa.DrawGuidance(shieldTargetPos, 0, 5000, $"一运盾连击指路");
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            }
+            else
+            {
+                var dp = sa.DrawGuidance(stackPos, 0, 5000, $"一运分摊指路");
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            }
+
+            if (myPriVal % 1000 >= 100)    // >100，小电视目标
+            {
+                var faceDir = (omegaBaldDirection + (omegaBaldCannonType != playerCannonType ? 2 : 0)) % 4;
+                var dp = sa.DrawStatic((ulong)sa.Data.Me, (ulong)0, 0, faceDir * 90f.DegToRad().Logic2Game(),
+                    1f, 4.5f, sa.Data.DefaultSafeColor, 0, 5000, $"小电视面向辅助-正确面向");
+                dp.FixRotation = true;
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp);
+                
+                // 由于DrawStatic一般用于静态方案，所以在rotation中加入了Game2Logic。跟随单位的需要额外加上Game2Logic。
+                var dp0 = sa.DrawStatic((ulong)sa.Data.Me, (ulong)0, 0, 0f.Logic2Game(),
+                    1f, 4.5f, sa.Data.DefaultDangerColor, 0, 5000, $"小电视面向辅助-自身");
+                sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Arrow, dp0);
+                
+                sa.Method.TextInfo($"小电视，站在外侧", 3000, true);
+            }
+            else
+                sa.Method.TextInfo($"躲避小电视，站在内侧", 3000, true);
+            
+            _events[4].Reset();
+        }
+        
+        [ScriptMethod(name: "一运 绘图删除，准备一传", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31529)$"],
+            userControl: Debugging)]
+        public void P5_DeltaVersionComplete(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            _phase = TopPhase.P5A2_DeltaWorld;
+            sa.Method.RemoveDraw("小电视.*");
+            sa.Method.RemoveDraw("一运.*");
+            
+            // 初始化_events
+            _events = Enumerable
+                .Range(0, 20)
+                .Select(_ => new ManualResetEvent(false))
+                .ToList();
+            
+            for (int i = 0; i < 8; i++)
+            {
+                _pd.Priorities[i] %= 100;    // 保留个位与十位
+            }
+            sa.Log.Debug($"一传：经矫正，{_pd.ShowPriorities()}");
+        }
+        
+        [ScriptMethod(name: "----《P5 一传》----", eventType: EventTypeEnum.NpcYell, eventCondition: ["HelloMyWorld"],
+            userControl: true)]
+        public void SplitLine_DeltaWorld(Event ev, ScriptAccessory sa)
+        {
+        }
+    
+        [ScriptMethod(name: "一传 蟑螂左右刀记录", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+            userControl: Debugging)]
+        public void P5_DeltaBeetleSwipeRecord(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A2_DeltaWorld) return;
+            const uint right = 31636;
+            _numbers[8] = ev.ActionId == right ? 1 : 2;
+            // var beetleSwipe = _numbers[8];
+            _events[0].Set();
+            // (int)RecordedIdx.BeetleSwipeRecorded
+        }        
+
+        [ScriptMethod(name: "一传 指路 *", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+            userControl: true)]
+        public void P5_DeltaWorldGuidance(Event ev, ScriptAccessory sa)
+        {
+            // var myMarker = MarkType.Bind2;
+            // _dv.BeetleSwipe = 2;    // 1右2左
+            // _dv.BeetleDirection = 1;
+            
+            if (_phase != TopPhase.P5A2_DeltaWorld) return;
+            _events[0].WaitOne();
+            var myIndex = sa.GetMyIndex();
+            // var myMarker = _dv.GetMarkers()[myIndex];
+            var markerVal = _pd.Priorities[myIndex];
+            
+            // 以蟑螂右刀，蟑螂在A为基准
+            List<Vector3> posList =
+            [
+                new(102f, 0, 81f),          // Atk1 - FarTarget
+                new(110.6f, 0, 116.2f),     // Atk2 - FarTarget
+                new(108.9f, 0, 88.9f),      // Atk3 - NearTarget
+                new(113.7f, 0, 86.3f),      // Atk4 - NearTarget
+                new(119.5f, 0, 100f),       // Bind1 - FarSource
+                new(106.5f, 0, 100f),       // Bind2 - NearSource
+                new(116.2f, 0, 111f),       // Stop1 - Idle
+                new(116.2f, 0, 111f)        // Stop2 - Idle
+            ];
+
+            var myPosIdx = markerVal switch
+            {
+                1 => 0,
+                2 => 1,
+                3 => 2,
+                4 => 3,
+                10 => 4,
+                20 => 5,
+                11 => 6,
+                21 => 7,
+                _ => -1,
+            };
+            
+            if (myPosIdx == -1)
+            {
+                sa.Log.Debug($"玩家标点信息{markerVal}读取错误");
+                return;
+            }
+
+            var beetleSwipe = _numbers[8];
+            var beetleDirection = _numbers[1];
+            
+            // 根据蟑螂左右刀与所在方位旋转折叠
+            var myPos = posList[myPosIdx];
+            var isRightSwipe = beetleSwipe == 1;
+            if (!isRightSwipe)
+                myPos = myPos.FoldPointHorizon(Center.X);
+            myPos = myPos.RotatePoint(Center, beetleDirection * 90f.DegToRad());
+
+            var dp = sa.DrawGuidance(myPos, 0, 5000, $"一传指路");
+            sa.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            _events[0].Reset();
+        }
+        
+        [ScriptMethod(name: "一传 指路移除", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(3163[67])$"],
+            userControl: Debugging)]
+        public void P5_DeltaWorldGuidanceRemove(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A2_DeltaWorld) return;
+            sa.Method.RemoveDraw("一传指路");
+        }
+        
+        [ScriptMethod(name: "一传 近线拉线提示", eventType: EventTypeEnum.StatusAdd, eventCondition: ["StatusID:1672"],
+            userControl: true)]
+        public void P5_DeltaWorldLocalTetherBreakHint(Event ev, ScriptAccessory sa)
+        {
+            // TODO 该功能未实现，目前未知原因
+            // 在DeltaVersion期间建立了近线
+            if (_phase != TopPhase.P5A2_DeltaWorld) return;
+
+            // 在线变为实线前，标点已取好
+            var myIndex = sa.GetMyIndex();
+            var markerVal = _pd.Priorities[myIndex];
+            if (markerVal is not 1 and not 2) return;
+            
+            // BreakLocalTether = 1
+            if (_bools[1]) return;
+            _bools[1] = true;
+
+            // 找到攻击1/2
+            var myPartner = _pd.SelectSpecificPriorityIndex(markerVal == 1 ? 1 : 0).Key;
+            var dur = (int)JsonConvert.DeserializeObject<uint>(ev["DurationMilliseconds"]);
+            sa.Log.Debug($"我的标点是Attack1或Attack2，将与{sa.GetPlayerJobByIndex(myPartner)}画拉线提示。{dur}");
+            
+            // 在还剩10秒时，DeltaWorld正在执行，需在最后2秒拉断。
+
+            var delay1 = dur - 8000;
+            var destroy1 = 6000;
+            var delay2 = dur - 3000;
+            var destroy2 = 3000;
+
+            // 近线实际距离约为10，取11
+            var dp1 = sa.DrawCircle(sa.Data.PartyList[myPartner], 11, delay1, destroy1, $"近线别拉断");
+            dp1.Color = sa.Data.DefaultDangerColor;
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp1);
+            
+            var dp2 = sa.DrawCircle(sa.Data.PartyList[myPartner], 11, delay2, destroy2, $"近线拉断");
+            dp2.Color = sa.Data.DefaultSafeColor;
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Circle, dp2);
         }
         
         [ScriptMethod(name: "P5_二运_分P", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:32788"], userControl: false)]
         public void P5_二运_分P(Event @event, ScriptAccessory accessory)
         {
             parse = 5.2;
+            _phase = TopPhase.P5B1_SigmaVersion;
+            InitParams();
+            _pd.Init(accessory, "P5二运");
             P52_semaphoreTowersWereConfirmed = new AutoResetEvent(false);
         }
         
@@ -2655,6 +3397,171 @@ namespace MyScriptNamespace
             
 
         #endregion
+        
+        #region 类函数
+
+        public class PriorityDict
+        {
+            // ReSharper disable once NullableWarningSuppressionIsUsed
+            public ScriptAccessory sa { get; set; } = null!;
+
+            // ReSharper disable once NullableWarningSuppressionIsUsed
+            public Dictionary<int, int> Priorities { get; set; } = null!;
+            public string Annotation { get; set; } = "";
+            public int ActionCount { get; set; } = 0;
+
+            public void Init(ScriptAccessory accessory, string annotation, int partyNum = 8)
+            {
+                sa = accessory;
+                Priorities = new Dictionary<int, int>();
+                for (var i = 0; i < partyNum; i++)
+                {
+                    Priorities.Add(i, 0);
+                }
+
+                Annotation = annotation;
+                ActionCount = 0;
+            }
+
+            /// <summary>
+            /// 为特定Key增加优先级
+            /// </summary>
+            /// <param name="idx">key</param>
+            /// <param name="priority">优先级数值</param>
+            public void AddPriority(int idx, int priority)
+            {
+                Priorities[idx] += priority;
+            }
+
+            /// <summary>
+            /// 从Priorities中找到前num个数值最小的，得到新的Dict返回
+            /// </summary>
+            /// <param name="num"></param>
+            /// <returns></returns>
+            public List<KeyValuePair<int, int>> SelectSmallPriorityIndices(int num)
+            {
+                return SelectMiddlePriorityIndices(0, num);
+            }
+
+            /// <summary>
+            /// 从Priorities中找到前num个数值最大的，得到新的Dict返回
+            /// </summary>
+            /// <param name="num"></param>
+            /// <returns></returns>
+            public List<KeyValuePair<int, int>> SelectLargePriorityIndices(int num)
+            {
+                return SelectMiddlePriorityIndices(0, num, true);
+            }
+
+            /// <summary>
+            /// 从Priorities中找到升序排列中间的数值，得到新的Dict返回
+            /// </summary>
+            /// <param name="skip">跳过skip个元素。若从第二个开始取，skip=1</param>
+            /// <param name="num"></param>
+            /// <param name="descending">降序排列，默认为false</param>
+            /// <returns></returns>
+            public List<KeyValuePair<int, int>> SelectMiddlePriorityIndices(int skip, int num, bool descending = false)
+            {
+                if (Priorities.Count < skip + num)
+                    return new List<KeyValuePair<int, int>>();
+
+                IEnumerable<KeyValuePair<int, int>> sortedPriorities;
+                if (descending)
+                {
+                    // 根据值从大到小降序排序，并取前num个键
+                    sortedPriorities = Priorities
+                        .OrderByDescending(pair => pair.Value) // 先根据值排列
+                        .ThenBy(pair => pair.Key) // 再根据键排列
+                        .Skip(skip) // 跳过前skip个元素
+                        .Take(num); // 取前num个键值对
+                }
+                else
+                {
+                    // 根据值从小到大升序排序，并取前num个键
+                    sortedPriorities = Priorities
+                        .OrderBy(pair => pair.Value) // 先根据值排列
+                        .ThenBy(pair => pair.Key) // 再根据键排列
+                        .Skip(skip) // 跳过前skip个元素
+                        .Take(num); // 取前num个键值对
+                }
+
+                return sortedPriorities.ToList();
+            }
+
+            /// <summary>
+            /// 从Priorities中找到升序排列第idx位的数据，得到新的Dict返回
+            /// </summary>
+            /// <param name="idx"></param>
+            /// <param name="descending">降序排列，默认为false</param>
+            /// <returns></returns>
+            public KeyValuePair<int, int> SelectSpecificPriorityIndex(int idx, bool descending = false)
+            {
+                var sortedPriorities = SelectMiddlePriorityIndices(0, Priorities.Count, descending);
+                return sortedPriorities[idx];
+            }
+
+            /// <summary>
+            /// 从Priorities中找到对应key的数据，得到其Value排序后位置返回
+            /// </summary>
+            /// <param name="key"></param>
+            /// <param name="descending">降序排列，默认为false</param>
+            /// <returns></returns>
+            public int FindPriorityIndexOfKey(int key, bool descending = false)
+            {
+                var sortedPriorities = SelectMiddlePriorityIndices(0, Priorities.Count, descending);
+                var i = 0;
+                foreach (var dict in sortedPriorities)
+                {
+                    if (dict.Key == key) return i;
+                    i++;
+                }
+
+                return i;
+            }
+
+            /// <summary>
+            /// 一次性增加优先级数值
+            /// 通常适用于特殊优先级（如H-T-D-H）
+            /// </summary>
+            /// <param name="priorities"></param>
+            public void AddPriorities(List<int> priorities)
+            {
+                if (Priorities.Count != priorities.Count)
+                    throw new ArgumentException("输入的列表与内部设置长度不同");
+
+                for (var i = 0; i < Priorities.Count; i++)
+                    AddPriority(i, priorities[i]);
+            }
+
+            /// <summary>
+            /// 输出优先级字典的Key与优先级
+            /// </summary>
+            /// <returns></returns>
+            public string ShowPriorities(bool showJob = true)
+            {
+                var str = $"{Annotation} ({ActionCount}-th) 优先级字典：\n";
+                if (Priorities.Count == 0)
+                {
+                    str += $"PriorityDict Empty.\n";
+                    return str;
+                }
+
+                foreach (var pair in Priorities)
+                {
+                    str += $"Key {pair.Key} {(showJob ? $"({_role[pair.Key]})" : "")}, Value {pair.Value}\n";
+                }
+
+                return str;
+            }
+
+            public void AddActionCount(int count = 1)
+            {
+                ActionCount += count;
+            }
+
+        }
+        
+        #endregion
         private static bool ParseObjectId(string? idStr, out uint id)
         {
             id = 0;
@@ -2745,6 +3652,11 @@ public static class EventExtensions
         }
     }
 
+    public static uint Id0(this Event @event)
+    {
+        return ParseHexId(@event["Id"], out var id) ? id : 0;
+    }
+    
     public static uint ActionId(this Event @event)
     {
         return JsonConvert.DeserializeObject<uint>(@event["ActionId"]);
@@ -2801,4 +3713,1049 @@ public static class EventExtensions
         return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
     }
 }
+
+#region 计算函数
+public static class DirectionCalc
+{
+    // 以北为0建立list
+    // Game         List    Logic
+    // 0            - 4     pi
+    // 0.25 pi      - 3     0.75pi
+    // 0.5 pi       - 2     0.5pi
+    // 0.75 pi      - 1     0.25pi
+    // pi           - 0     0
+    // 1.25 pi      - 7     1.75pi
+    // 1.5 pi       - 6     1.5pi
+    // 1.75 pi      - 5     1.25pi
+    // Logic = Pi - Game (+ 2pi)
+
+    /// <summary>
+    /// 将游戏基角度（以南为0，逆时针增加）转为逻辑基角度（以北为0，顺时针增加）
+    /// 算法与Logic2Game完全相同，但为了代码可读性，便于区分。
+    /// </summary>
+    /// <param name="radian">游戏基角度</param>
+    /// <returns>逻辑基角度</returns>
+    public static float Game2Logic(this float radian)
+    {
+        // if (r < 0) r = (float)(r + 2 * Math.PI);
+        // if (r > 2 * Math.PI) r = (float)(r - 2 * Math.PI);
+
+        var r = float.Pi - radian;
+        r = (r + float.Pi * 2) % (float.Pi * 2);
+        return r;
+    }
+
+    /// <summary>
+    /// 将逻辑基角度（以北为0，顺时针增加）转为游戏基角度（以南为0，逆时针增加）
+    /// 算法与Game2Logic完全相同，但为了代码可读性，便于区分。
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <returns>游戏基角度</returns>
+    public static float Logic2Game(this float radian)
+    {
+        // var r = (float)Math.PI - radian;
+        // if (r < Math.PI) r = (float)(r + 2 * Math.PI);
+        // if (r > Math.PI) r = (float)(r - 2 * Math.PI);
+
+        return radian.Game2Logic();
+    }
+
+    /// <summary>
+    /// 适用于旋转，FF14游戏基顺时针旋转为负。
+    /// </summary>
+    /// <param name="radian"></param>
+    /// <returns></returns>
+    public static float Cw2Ccw(this float radian)
+    {
+        return -radian;
+    }
+
+    /// <summary>
+    /// 适用于旋转，FF14游戏基顺时针旋转为负。
+    /// 与Cw2CCw完全相同，为了代码可读性便于区分。
+    /// </summary>
+    /// <param name="radian"></param>
+    /// <returns></returns>
+    public static float Ccw2Cw(this float radian)
+    {
+        return -radian;
+    }
+
+    /// <summary>
+    /// 输入逻辑基角度，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
+    /// </summary>
+    /// <param name="radian">逻辑基角度</param>
+    /// <param name="dirs">方位总数</param>
+    /// <param name="diagDivision">斜分割，默认true</param>
+    /// <returns>逻辑基角度对应的逻辑方位</returns>
+    public static int Rad2Dirs(this float radian, int dirs, bool diagDivision = true)
+    {
+        var r = diagDivision
+            ? Math.Round(radian / (2f * float.Pi / dirs))
+            : Math.Floor(radian / (2f * float.Pi / dirs));
+        r = (r + dirs) % dirs;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 输入坐标，获取逻辑方位（斜分割以正上为0，正分割以右上为0，顺时针增加）
+    /// </summary>
+    /// <param name="point">坐标点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="dirs">方位总数</param>
+    /// <param name="diagDivision">斜分割，默认true</param>
+    /// <returns>该坐标点对应的逻辑方位</returns>
+    public static int Position2Dirs(this Vector3 point, Vector3 center, int dirs, bool diagDivision = true)
+    {
+        double dirsDouble = dirs;
+        var r = diagDivision
+            ? Math.Round(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble
+            : Math.Floor(dirsDouble / 2 - dirsDouble / 2 * Math.Atan2(point.X - center.X, point.Z - center.Z) / Math.PI) % dirsDouble;
+        return (int)r;
+    }
+
+    /// <summary>
+    /// 以逻辑基弧度旋转某点
+    /// </summary>
+    /// <param name="point">待旋转点坐标</param>
+    /// <param name="center">中心</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <returns>旋转后坐标点</returns>
+    public static Vector3 RotatePoint(this Vector3 point, Vector3 center, float radian)
+    {
+        // 围绕某点顺时针旋转某弧度
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var rot = MathF.PI - MathF.Atan2(v2.X, v2.Y) + radian;
+        var length = v2.Length();
+        return new Vector3(center.X + MathF.Sin(rot) * length, center.Y, center.Z - MathF.Cos(rot) * length);
+    }
+
+    /// <summary>
+    /// 以逻辑基角度从某中心点向外延伸
+    /// </summary>
+    /// <param name="center">待延伸中心点</param>
+    /// <param name="radian">旋转弧度</param>
+    /// <param name="length">延伸长度</param>
+    /// <returns>延伸后坐标点</returns>
+    public static Vector3 ExtendPoint(this Vector3 center, float radian, float length)
+    {
+        // 令某点以某弧度延伸一定长度
+        return new Vector3(center.X + MathF.Sin(radian) * length, center.Y, center.Z - MathF.Cos(radian) * length);
+    }
+
+    /// <summary>
+    /// 寻找外侧某点到中心的逻辑基弧度
+    /// </summary>
+    /// <param name="center">中心</param>
+    /// <param name="newPoint">外侧点</param>
+    /// <returns>外侧点到中心的逻辑基弧度</returns>
+    public static float FindRadian(this Vector3 newPoint, Vector3 center)
+    {
+        var radian = MathF.PI - MathF.Atan2(newPoint.X - center.X, newPoint.Z - center.Z);
+        if (radian < 0)
+            radian += 2 * MathF.PI;
+        return radian;
+    }
+
+    /// <summary>
+    /// 将输入点左右折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerX">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointHorizon(this Vector3 point, float centerX)
+    {
+        return point with { X = 2 * centerX - point.X };
+    }
+
+    /// <summary>
+    /// 将输入点上下折叠
+    /// </summary>
+    /// <param name="point">待折叠点</param>
+    /// <param name="centerZ">中心折线坐标点</param>
+    /// <returns></returns>
+    public static Vector3 FoldPointVertical(this Vector3 point, float centerZ)
+    {
+        return point with { Z = 2 * centerZ - point.Z };
+    }
+
+    /// <summary>
+    /// 将输入点中心对称
+    /// </summary>
+    /// <param name="point">输入点</param>
+    /// <param name="center">中心点</param>
+    /// <returns></returns>
+    public static Vector3 PointCenterSymmetry(this Vector3 point, Vector3 center)
+    {
+        return point.RotatePoint(center, float.Pi);
+    }
+
+    /// <summary>
+    /// 将输入点朝某中心点往内/外同角度延伸，默认向内
+    /// </summary>
+    /// <param name="point">待延伸点</param>
+    /// <param name="center">中心点</param>
+    /// <param name="length">延伸长度</param>
+    /// <param name="isOutside">是否向外延伸</param>>
+    /// <returns></returns>
+    public static Vector3 PointInOutside(this Vector3 point, Vector3 center, float length, bool isOutside = false)
+    {
+        Vector2 v2 = new(point.X - center.X, point.Z - center.Z);
+        var targetPos = (point - center) / v2.Length() * length * (isOutside ? 1 : -1) + point;
+        return targetPos;
+    }
+
+    /// <summary>
+    /// 获得两点之间距离
+    /// </summary>
+    /// <param name="point"></param>
+    /// <param name="target"></param>
+    /// <returns></returns>
+    public static float DistanceTo(this Vector3 point, Vector3 target)
+    {
+        Vector2 v2 = new(point.X - target.X, point.Z - target.Z);
+        return v2.Length();
+    }
+
+    /// <summary>
+    /// 寻找两点之间的角度差，范围0~360deg
+    /// </summary>
+    /// <param name="basePoint">基准位置</param>
+    /// <param name="targetPos">比较目标位置</param>
+    /// <param name="center">场地中心</param>
+    /// <returns></returns>
+    public static float FindRadianDifference(this Vector3 targetPos, Vector3 basePoint, Vector3 center)
+    {
+        var baseRad = basePoint.FindRadian(center);
+        var targetRad = targetPos.FindRadian(center);
+        var deltaRad = targetRad - baseRad;
+        if (deltaRad < 0)
+            deltaRad += float.Pi * 2;
+        return deltaRad;
+    }
+
+    /// <summary>
+    /// 从第三人称视角出发观察某目标是否在另一目标的右侧。
+    /// </summary>
+    /// <param name="basePoint">基准位置</param>
+    /// <param name="targetPos">比较目标位置</param>
+    /// <param name="center">场地中心</param>
+    /// <returns></returns>
+    public static bool IsAtRight(this Vector3 targetPos, Vector3 basePoint, Vector3 center)
+    {
+        // 从场中看向场外，在右侧
+        return targetPos.FindRadianDifference(basePoint, center) < float.Pi;
+    }
+
+    /// <summary>
+    /// 获取给定数的指定位数
+    /// </summary>
+    /// <param name="val">给定数值</param>
+    /// <param name="x">对应位数，个位为1</param>
+    /// <returns></returns>
+    public static int GetDecimalDigit(this int val, int x)
+    {
+        string valStr = val.ToString();
+        int length = valStr.Length;
+
+        if (x < 1 || x > length)
+        {
+            return -1;
+        }
+
+        char digitChar = valStr[length - x]; // 从右往左取第x位
+        return int.Parse(digitChar.ToString());
+    }
+}
+#endregion 计算函数
+
+#region 位置序列函数
+public static class IndexHelper
+{
+    public static IGameObject? GetById(this ScriptAccessory sa, ulong gameObjectId)
+    {
+        return sa.Data.Objects.SearchById(gameObjectId);
+    }
+    
+    /// <summary>
+    /// 输入玩家dataId，获得对应的位置index
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置index</returns>
+    public static int GetPlayerIdIndex(this ScriptAccessory accessory, uint pid)
+    {
+        // 获得玩家 IDX
+        return accessory.Data.PartyList.IndexOf(pid);
+    }
+
+    /// <summary>
+    /// 获得主视角玩家对应的位置index
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <returns>主视角玩家对应的位置index</returns>
+    public static int GetMyIndex(this ScriptAccessory accessory)
+    {
+        return accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+    }
+
+    /// <summary>
+    /// 输入玩家dataId，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="pid">玩家SourceId</param>
+    /// <param name="accessory"></param>
+    /// <returns>该玩家对应的位置称呼</returns>
+    public static string GetPlayerJobById(this ScriptAccessory accessory, uint pid)
+    {
+        // 获得玩家职能简称，无用处，仅作DEBUG输出
+        var idx = accessory.Data.PartyList.IndexOf(pid);
+        var str = accessory.GetPlayerJobByIndex(idx);
+        return str;
+    }
+
+    /// 输入位置index，获得对应的位置称呼，输出字符仅作文字输出用
+    /// </summary>
+    /// <param name="idx">位置index</param>
+    /// <param name="fourPeople">是否为四人迷宫</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static string GetPlayerJobByIndex(this ScriptAccessory accessory, int idx, bool fourPeople = false)
+    {
+        List<string> role8 = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
+        List<string> role4 = ["T", "H", "D1", "D2"];
+        if (idx < 0 || idx >= 8 || (fourPeople && idx >= 4))
+            return "Unknown";
+        return fourPeople ? role4[idx] : role8[idx];
+    }
+}
+#endregion 位置序列函数
+
+#region 绘图函数
+public static class AssignDp
+{
+    /// <summary>
+    /// 返回箭头指引相关dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerObj">箭头起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">箭头指向目标，可输入uint或Vector3，为0则无目标</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="rotation">箭头旋转角度</param>
+    /// <param name="scale">箭头宽度</param>
+    /// <param name="isSafe">使用安全色</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory,
+        object ownerObj, object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Rotation = rotation;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        dp.Color = isSafe ? accessory.Data.DefaultSafeColor : accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+
+        if (ownerObj is uint or ulong)
+        {
+            dp.Owner = (ulong)ownerObj;
+        }
+        else if (ownerObj is Vector3 spos)
+        {
+            dp.Position = spos;
+        }
+        else
+        {
+            throw new ArgumentException("ownerObj的目标类型输入错误");
+        }
+
+        if (targetObj is uint or ulong)
+        {
+            if ((ulong)targetObj != 0) dp.TargetObject = (ulong)targetObj;
+        }
+        else if (targetObj is Vector3 tpos)
+        {
+            dp.TargetPosition = tpos;
+        }
+        else
+        {
+            throw new ArgumentException("targetObj的目标类型输入错误");
+        }
+
+        return dp;
+    }
+
+    public static DrawPropertiesEdit DrawGuidance(this ScriptAccessory accessory,
+        object targetObj, int delay, int destroy, string name, float rotation = 0, float scale = 1f, bool isSafe = true)
+    => accessory.DrawGuidance((ulong)accessory.Data.Me, targetObj, delay, destroy, name, rotation, scale, isSafe);
+
+    /// <summary>
+    /// 返回扇形左右刀
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="isLeftCleave">是左刀</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawLeftRightCleave(this ScriptAccessory accessory, ulong ownerId, bool isLeftCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Radian = radian;
+        dp.Rotation = isLeftCleave ? float.Pi / 2 : -float.Pi / 2;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回扇形前后刀
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="isFrontCleave">是前刀</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawFrontBackCleave(this ScriptAccessory accessory, ulong ownerId, bool isFrontCleave, int delay, int destroy, string name, float radian = float.Pi, float scale = 60f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Radian = radian;
+        dp.Rotation = isFrontCleave ? 0 : -float.Pi;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回距离某对象目标最近/最远的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="orderIdx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="isNear">true为最近，false为最远</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawTargetNearFarOrder(this ScriptAccessory accessory, ulong ownerId, uint orderIdx,
+        bool isNear, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.CentreResolvePattern =
+            isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
+        dp.CentreOrderIndex = orderIdx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回距离某坐标位置最近/最远的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="position">特定坐标点</param>
+    /// <param name="orderIdx">顺序，从1开始</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="isNear">true为最近，false为最远</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawPositionNearFarOrder(this ScriptAccessory accessory, Vector3 position, uint orderIdx,
+        bool isNear, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Position = position;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.TargetResolvePattern =
+            isNear ? PositionResolvePatternEnum.PlayerNearestOrder : PositionResolvePatternEnum.PlayerFarestOrder;
+        dp.TargetOrderIndex = orderIdx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回ownerId施法目标的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawOwnersTarget(this ScriptAccessory accessory, ulong ownerId, float width, float length, int delay,
+        int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.TargetResolvePattern = PositionResolvePatternEnum.OwnerTarget;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回ownerId仇恨相关的dp
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为boss</param>
+    /// <param name="orderIdx">仇恨顺序，从1开始</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawOwnersEnmityOrder(this ScriptAccessory accessory, ulong ownerId, uint orderIdx, float width, float length, int delay, int destroy, string name, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.CentreResolvePattern = PositionResolvePatternEnum.OwnerEnmityOrder;
+        dp.CentreOrderIndex = orderIdx;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回owner与target的dp，可修改 dp.Owner, dp.TargetObject, dp.Scale
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己</param>
+    /// <param name="targetId">目标单位id</param>
+    /// <param name="rotation">绘图旋转角度</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawTarget2Target(this ScriptAccessory accessory, ulong ownerId, ulong targetId, float width, float length, int delay, int destroy, string name, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Rotation = rotation;
+        dp.Owner = ownerId;
+        dp.TargetObject = targetId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= lengthByDistance ? ScaleMode.YByDistance : ScaleMode.None;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回画向某目标的扇形绘图
+    /// </summary>
+    /// <param name="sourceId">起始目标id，通常为自己</param>
+    /// <param name="targetId">目标单位id</param>
+    /// <param name="radian">扇形角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="color">绘图颜色</param>
+    /// <param name="rotation">旋转角度</param>
+    /// <param name="lengthByDistance">长度是否随距离改变</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawFanToTarget(this ScriptAccessory accessory, ulong sourceId, ulong targetId, float radian, float scale, int delay, int destroy, string name, Vector4 color, float rotation = 0, bool lengthByDistance = false, bool byTime = false)
+    {
+        var dp = accessory.DrawTarget2Target(sourceId, targetId, scale, scale, delay, destroy, name, rotation, lengthByDistance, byTime);
+        dp.Radian = radian;
+        dp.Color = color;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回owner与target之间的连线dp，使用Line绘制
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="ownerId">起始目标id，通常为自己</param>
+    /// <param name="targetId">目标单位id</param>
+    /// <param name="scale">线条宽度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawConnectionBetweenTargets(this ScriptAccessory accessory, ulong ownerId,
+        ulong targetId, int delay, int destroy, string name, float scale = 1f)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Owner = ownerId;
+        dp.TargetObject = targetId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= ScaleMode.YByDistance;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回圆形dp，跟随owner，可修改 dp.Owner, dp.Scale
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="scale">圆圈尺寸</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawCircle(this ScriptAccessory accessory, ulong ownerId, float scale, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回环形dp，跟随owner，可修改 dp.Owner, dp.Scale
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="scale">外环实心尺寸</param>
+    /// <param name="innerScale">内环空心尺寸</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawDonut(this ScriptAccessory accessory, ulong ownerId, float scale, float innerScale, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.DrawFan(ownerId, float.Pi * 2, 0, scale, innerScale, delay, destroy, name, byTime);
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态dp，通常用于指引固定位置。可修改 dp.Position, dp.Rotation, dp.Scale
+    /// </summary>
+    /// <param name="ownerObj">绘图起始，可输入uint或Vector3</param>
+    /// <param name="targetObj">绘图目标，可输入uint或Vector3，为0则无目标</param>
+    /// <param name="radian">图形角度</param>
+    /// <param name="rotation">旋转角度，以北为0度顺时针</param>
+    /// <param name="width">绘图宽度</param>
+    /// <param name="length">绘图长度</param>
+    /// <param name="color">是Vector4则选用该颜色</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStatic(this ScriptAccessory accessory, object ownerObj, object targetObj,
+        float radian, float rotation, float width, float length, object color, int delay, int destroy, string name)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+
+        if (ownerObj is uint or ulong)
+        {
+            dp.Owner = (ulong)ownerObj;
+        }
+        else if (ownerObj is Vector3 spos)
+        {
+            dp.Position = spos;
+        }
+        else
+        {
+            throw new ArgumentException("ownerObj的目标类型输入错误");
+        }
+
+        if (targetObj is uint or ulong)
+        {
+            if ((ulong)targetObj != 0) dp.TargetObject = (ulong)targetObj;
+        }
+        else if (targetObj is Vector3 tpos)
+        {
+            dp.TargetPosition = tpos;
+        }
+        else
+        {
+            throw new ArgumentException("ownerObj的目标类型输入错误");
+        }
+
+        dp.Radian = radian;
+        dp.Rotation = rotation.Logic2Game();
+
+        switch (color)
+        {
+            case Vector4 clr:
+                dp.Color = clr;
+                break;
+            default:
+                dp.Color = accessory.Data.DefaultDangerColor;
+                break;
+        }
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回静态圆圈dp，通常用于指引固定位置。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="center">圆圈中心位置</param>
+    /// <param name="color">圆圈颜色</param>
+    /// <param name="scale">圆圈尺寸，默认1.5f</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStaticCircle(this ScriptAccessory accessory, Vector3 center, Vector4 color,
+        int delay, int destroy, string name, float scale = 1.5f)
+        => accessory.DrawStatic(center, (ulong)0, 0, 0, scale, scale, color, delay, destroy, name);
+    // {
+    //     var dp = accessory.DrawStatic(center, (uint)0, 0, 0, scale, scale, color, delay, destroy, name);
+    //     return dp;
+    // }
+
+    /// <summary>
+    /// 返回静态月环dp，通常用于指引固定位置。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="center">月环中心位置</param>
+    /// <param name="color">月环颜色</param>
+    /// <param name="scale">月环外径，默认1.5f</param>
+    /// <param name="innerscale">月环内径，默认scale-0.05f</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawStaticDonut(this ScriptAccessory accessory, Vector3 center, Vector4 color,
+        int delay, int destroy, string name, float scale, float innerscale = 0)
+        => accessory.DrawStatic(center, (ulong)0,
+        float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
+
+    // {
+    //     var dp = accessory.DrawStatic(center, (uint)0, float.Pi * 2, 0, scale, scale, color, delay, destroy, name);
+    //     dp.InnerScale = innerscale != 0f ? new Vector2(innerscale) : new Vector2(scale - 0.05f);
+    //     return dp;
+    // }
+
+    /// <summary>
+    /// 返回矩形
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="width">矩形宽度</param>
+    /// <param name="length">矩形长度</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawRect(this ScriptAccessory accessory, ulong ownerId, float width, float length, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回扇形
+    /// </summary>
+    /// <param name="ownerId">起始目标id，通常为自己或Boss</param>
+    /// <param name="radian">扇形弧度</param>
+    /// <param name="rotation">图形旋转角度</param>
+    /// <param name="scale">扇形尺寸</param>
+    /// <param name="innerScale">扇形内环空心尺寸</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <param name="accessory"></param>
+    /// <returns></returns>
+    public static DrawPropertiesEdit DrawFan(this ScriptAccessory accessory, ulong ownerId, float radian, float rotation, float scale, float innerScale, int delay, int destroy, string name, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(scale);
+        dp.InnerScale = new Vector2(innerScale);
+        dp.Radian = radian;
+        dp.Rotation = rotation;
+        dp.Owner = ownerId;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    /// <summary>
+    /// 返回击退
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="target">击退源，可输入uint或Vector3</param>
+    /// <param name="width">击退绘图宽度</param>
+    /// <param name="length">击退绘图长度/距离</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
+    /// <param name="byTime">动画效果随时间填充</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, ulong ownerId, object target, float length, int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Scale = new Vector2(width, length);
+        dp.Owner = ownerId;
+
+        if (target is uint or ulong)
+        {
+            dp.TargetObject = (ulong)target;
+        }
+        else if (target is Vector3 tpos)
+        {
+            dp.TargetPosition = tpos;
+        }
+        else
+        {
+            throw new ArgumentException("DrawKnockBack的目标类型输入错误");
+        }
+
+        dp.Rotation = float.Pi;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        dp.ScaleMode |= byTime ? ScaleMode.ByTime : ScaleMode.None;
+        return dp;
+    }
+
+    public static DrawPropertiesEdit DrawKnockBack(this ScriptAccessory accessory, object target, float length,
+        int delay, int destroy, string name, float width = 1.5f, bool byTime = false)
+        => accessory.DrawKnockBack(accessory.Data.Me, target, length, delay, destroy, name, width, byTime);
+
+    /// <summary>
+    /// 返回背对
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="target">背对源，可输入uint或Vector3</param>
+    /// <param name="delay">延时delay ms出现</param>
+    /// <param name="destroy">绘图自出现起，经destroy ms消失</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="ownerId">起始目标ID，通常为自己或其他玩家</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, ulong ownerId, object target, int delay, int destroy, string name)
+    {
+        var dp = accessory.Data.GetDefaultDrawProperties();
+        dp.Name = name;
+        dp.Color = accessory.Data.DefaultDangerColor;
+        dp.Owner = ownerId;
+
+
+        if (target is uint or ulong)
+        {
+            dp.TargetObject = (ulong)target;
+        }
+        else if (target is Vector3 tpos)
+        {
+            dp.TargetPosition = tpos;
+        }
+        else
+        {
+            throw new ArgumentException("DrawKnockBack的目标类型输入错误");
+        }
+
+        dp.Delay = delay;
+        dp.DestoryAt = destroy;
+        return dp;
+    }
+
+    public static DrawPropertiesEdit DrawSightAvoid(this ScriptAccessory accessory, object target, int delay,
+        int destroy, string name)
+        => accessory.DrawSightAvoid(accessory.Data.Me, target, delay, destroy, name);
+
+    /// <summary>
+    /// 返回多方向延伸指引
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="owner">分散源</param>
+    /// <param name="extendDirs">分散角度</param>
+    /// <param name="myDirIdx">玩家对应角度idx</param>
+    /// <param name="width">指引箭头宽度</param>
+    /// <param name="length">指引箭头长度</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPlayer">玩家对应箭头指引颜色</param>
+    /// <param name="colorNormal">其他玩家对应箭头指引颜色</param>
+    /// <returns></returns>
+    /// <exception cref="ArgumentException"></exception>
+    public static List<DrawPropertiesEdit> DrawExtendDirection(this ScriptAccessory accessory, object owner,
+        List<float> extendDirs, int myDirIdx, float width, float length, int delay, int destroy, string name,
+        Vector4 colorPlayer, Vector4 colorNormal)
+    {
+        List<DrawPropertiesEdit> dpList = [];
+
+
+        if (owner is uint or ulong)
+        {
+            for (var i = 0; i < extendDirs.Count; i++)
+            {
+                var dp = accessory.DrawRect((ulong)owner, width, length, delay, destroy, $"{name}{i}");
+                dp.Rotation = extendDirs[i];
+                dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                dpList.Add(dp);
+            }
+        }
+        else if (owner is Vector3 spos)
+        {
+            for (var i = 0; i < extendDirs.Count; i++)
+            {
+                var dp = accessory.DrawGuidance(spos, spos.ExtendPoint(extendDirs[i], length), delay, destroy,
+                    $"{name}{i}", 0, width);
+                dp.Color = i == myDirIdx ? colorPlayer : colorNormal;
+                dpList.Add(dp);
+            }
+        }
+        else
+        {
+            throw new ArgumentException("DrawExtendDirection的目标类型输入错误");
+        }
+
+        return dpList;
+    }
+
+    /// <summary>
+    /// 返回多地点指路指引列表
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="positions">地点位置</param>
+    /// <param name="delay">绘图出现延时</param>
+    /// <param name="destroy">绘图消失时间</param>
+    /// <param name="name">绘图名称</param>
+    /// <param name="colorPosPlayer">对应位置标记行动颜色</param>
+    /// <param name="colorPosNormal">对应位置标记准备颜色</param>
+    /// <param name="colorGo">指路出发箭头颜色</param>
+    /// <param name="colorPrepare">指路准备箭头颜色</param>
+    /// <returns>dpList中的三个List：位置标记，玩家指路箭头，地点至下个地点的指路箭头</returns>
+    public static List<List<DrawPropertiesEdit>> DrawMultiGuidance(this ScriptAccessory accessory,
+        List<Vector3> positions, List<int> delay, List<int> destroy, string name,
+        Vector4 colorGo, Vector4 colorPrepare, Vector4 colorPosNormal, Vector4 colorPosPlayer)
+    {
+        List<List<DrawPropertiesEdit>> dpList = [[], [], []];
+        for (var i = 0; i < positions.Count; i++)
+        {
+            var dpPos = accessory.DrawStaticCircle(positions[i], colorPosPlayer, delay[i], destroy[i], $"{name}pos{i}");
+            dpList[0].Add(dpPos);
+            var dpGuide = accessory.DrawGuidance(positions[i], colorGo, delay[i], destroy[i], $"{name}guide{i}");
+            dpList[1].Add(dpGuide);
+            if (i == positions.Count - 1) break;
+            var dpPrep = accessory.DrawGuidance(positions[i], positions[i + 1], delay[i], destroy[i], $"{name}prep{i}");
+            dpList[2].Add(dpPrep);
+        }
+        return dpList;
+    }
+
+    public static void DebugMsg(this ScriptAccessory accessory, string str, bool debugMode = false, bool debugChat = false)
+    {
+        if (!debugMode)
+            return;
+        accessory.Log.Debug($"/e [DEBUG] {str}");
+
+        if (!debugChat)
+            return;
+        accessory.Method.SendChat($"/e [DEBUG] {str}");
+    }
+
+    /// <summary>
+    /// 将List内信息转换为字符串。
+    /// </summary>
+    /// <param name="accessory"></param>
+    /// <param name="myList"></param>
+    /// <param name="isJob">是职业，在转为字符串前调用转职业函数</param>
+    /// <typeparam name="T"></typeparam>
+    /// <returns></returns>
+    public static string BuildListStr<T>(this ScriptAccessory accessory, List<T> myList, bool isJob = false)
+    {
+        return string.Join(", ", myList.Select(item =>
+        {
+            if (isJob && item != null && item is int i)
+                return accessory.GetPlayerJobByIndex(i);
+            return item?.ToString() ?? "";
+        }));
+    }
+}
+
+#endregion 绘图函数
 
