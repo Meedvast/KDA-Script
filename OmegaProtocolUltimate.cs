@@ -119,7 +119,11 @@ namespace MyScriptNamespace
             ArrowNum = 0;
             CannonNum = 0;
             StepCannonIndex = 0;
+            P52_OmegaMDir = 0;
+            P52_OmegaFDirDone = false;
+            P52_OmegaFDir = 0;
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
+            accessory.Method.RemoveDraw(".*");
         }
         #region P1
         [ScriptMethod(name: "P1_循环程序_分P", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31491"],userControl:false)]
@@ -1775,14 +1779,25 @@ namespace MyScriptNamespace
             }
             
             var dp1 = accessory.Data.GetDefaultDrawProperties();
-            dp1.Name = "P52_击退指路";
+            dp1.Name = "P52_击退指路起点";
             dp1.Scale = new(2);
             dp1.Owner = accessory.Data.Me;
-            dp1.TargetPosition = P52_TowerPos[targetIndex];
+            dp1.TargetPosition = RotatePoint(new Vector3(100,0,97), new Vector3(100,0,100), targetIndex * float.Pi / 8);
             dp1.ScaleMode |= ScaleMode.YByDistance;
             dp1.Color = accessory.Data.DefaultSafeColor;
-            dp1.DestoryAt = 6500;
+            dp1.DestoryAt = 4500;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp1);
+            
+            var dp2 = accessory.Data.GetDefaultDrawProperties();
+            dp2.Name = "P52_击退指路";
+            dp2.Scale = new(1.5f, 13);
+            dp2.ScaleMode |= ScaleMode.YByDistance;
+            dp2.Owner = accessory.Data.Me;
+            dp2.TargetPosition = P52_TowerPos[targetIndex];
+            dp2.Rotation = 0;
+            dp2.Color = accessory.Data.DefaultSafeColor;
+            dp2.DestoryAt = 6500;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp2);
         }
         
         
@@ -1830,6 +1845,18 @@ namespace MyScriptNamespace
         {
             if (parse != 5.21) return;
             if (!ParseObjectId(@event["TargetId"], out var tid)) return;
+            int P52_OmegaFfixDir = P52_OmegaFDir switch
+            {
+                0 => 0,
+                1 => 3,
+                2 => 2,
+                3 => 1,
+                4 => 0,
+                5 => 3,
+                6 => 2,
+                7 => 1,
+            };
+            
             int dx = -1;
             if (@event["Id"] == "009D")
             {
@@ -1840,10 +1867,11 @@ namespace MyScriptNamespace
                 var dp = accessory.Data.GetDefaultDrawProperties();
                 dp.Name = $"P5_二运_旋转激光_{i}";
                 dp.Scale = new(50,12);
-                dp.Position = new Vector3(100, 0, 100);
-                dp.Rotation = ((float.Pi / 4 * P52_OmegaFDir + float.Pi / 2) + (0.152f * i * dx)) % float.Pi; ;
+                dp.Owner = tid;
+                dp.FixRotation = true;
+                dp.Rotation = float.Pi / 2 + float.Pi / 4 * P52_OmegaFfixDir + float.Pi / 20 * i * dx;
                 dp.Color = accessory.Data.DefaultDangerColor;
-                dp.DestoryAt = 10000 + 620*i;
+                dp.DestoryAt = 10000 + 580*i;
                 accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Straight, dp);
             }
         }
@@ -1876,7 +1904,7 @@ namespace MyScriptNamespace
                 }
             }
             var dp = accessory.Data.GetDefaultDrawProperties();
-            dp.Name = $"P5_二运_后半起跑点";
+            dp.Name = "P5_二运_后半起跑点";
             dp.Scale = new(2);
             dp.Owner = accessory.Data.Me;
             dp.TargetPosition = dealpos;
@@ -1993,7 +2021,7 @@ namespace MyScriptNamespace
         {
             if (parse != 5.3) return;
             if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-            float rot = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31644 ? 90 : 0;
+            float rot = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31644 ? float.Pi / 2 : 0;
             
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P5_三运_扩散波动炮一段";
@@ -2123,6 +2151,24 @@ namespace MyScriptNamespace
                     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
                 }
             }
+        }
+        
+        [ScriptMethod(name: "P5_三运_探测波动炮", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31638|31639)$"], userControl: true)]
+        public void P5_三运_探测波动炮(Event @event, ScriptAccessory accessory)
+        {
+            if (parse != 5.3) return;
+            if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+            int dir = @event["ActionId"] == "31638" ? 1 : -1;
+            
+            var dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P5_三运_探测波动炮";
+            dp.Scale = new(20);
+            dp.Radian = float.Pi;
+            dp.Owner = sid;
+            dp.Rotation = float.Pi + float.Pi / 2 * dir;
+            dp.Color = accessory.Data.DefaultDangerColor;
+            dp.DestoryAt = 10000;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
         }
         
         [ScriptMethod(name: "P5_三运_三传指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31638|31639)$"], userControl: true)]
