@@ -7,5 +7,14 @@
     "TerritoryIds": [1122],
     "DownloadUrl": "https://raw.githubusercontent.com/Meedvast/KDA-Script/refs/heads/main/P6%E5%B0%84%E6%89%8B%E5%A4%A9%E5%89%91.cs",
     "UpdateInfo": "v0.0.0.10"
+  },
+  {
+    "Name": "绝欧精装抢先体验版",
+    "Guid": "e0bfb4db-0d38-909f-5088-b23f09b7585e",
+    "Version": "0.0.0.1",
+    "Author": "Karlin",
+    "TerritoryIds": [1122],
+    "DownloadUrl": "",
+    "UpdateInfo": "实验版本"
   }
 ]
