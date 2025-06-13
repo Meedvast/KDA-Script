@@ -27,13 +27,13 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装抢先体验版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.2", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.2", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
         """
         欧米茄验证绝境战(基于K佬原有脚本添加P5二三运，P6指路)
-		感谢Usami提供的P5一运指路
+        感谢Usami提供的P5一运指路
         """;
 
         [UserSetting("P3_开场排队顺序")]
