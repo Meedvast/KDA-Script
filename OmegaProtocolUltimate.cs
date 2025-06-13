@@ -22,16 +22,18 @@ using ECommons.GameFunctions;
 using ECommons.MathHelpers;
 using KodakkuAssist.Module.GameOperate;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
+using FFXIVClientStructs.FFXIV.Client.Game.Object;
 
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装抢先体验版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.1", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装抢先体验版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.2", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
         """
         欧米茄验证绝境战(基于K佬原有脚本添加P5二三运，P6指路)
+		感谢Usami提供的P5一运指路
         """;
 
         [UserSetting("P3_开场排队顺序")]
@@ -89,7 +91,7 @@ namespace MyScriptNamespace
         int P53_MarkType;
         float P53_4_HW;
         int P5_3_MF = 0;
-
+        private bool P5_TV_Support_enable = false;
         public enum Pattern { Unknown, InOut, OutIn }
         private Pattern _curPattern = Pattern.Unknown;
         private Vector3 MapCenter = new(100.0f, 0.0f, 100.0f);
@@ -128,7 +130,7 @@ namespace MyScriptNamespace
             P5D_BlindFaith,          // P5 盲信
         }
         private static List<string> _role = ["MT", "ST", "H1", "H2", "D1", "D2", "D3", "D4"];
-        private const bool Debugging = true;
+        private const bool Debugging = false;
         private static readonly Vector3 Center = new Vector3(100, 0, 100);
         private static TopPhase _phase = TopPhase.Init;
         private volatile List<bool> _bools = new bool[20].ToList();
@@ -151,13 +153,9 @@ namespace MyScriptNamespace
             P52_OmegaFDirDone = false;
             P52_OmegaFDir = 0;
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
-<<<<<<< main
             InitParams();
             _phase = TopPhase.Init;
             sa.Method.RemoveDraw(".*");
-=======
-            accessory.Method.RemoveDraw(".*");
->>>>>>> main
         }
         
         private void InitParams()
@@ -1675,6 +1673,35 @@ namespace MyScriptNamespace
             accessory.Log.Debug($"当前阶段为：{_phase}");
         }
         
+        [ScriptMethod(name: "P5_一运_眼睛激光", eventType: EventTypeEnum.EnvControl, eventCondition: ["DirectorId:800375AC", "Id:00020001"])]
+        public void P5_一运_眼睛激光(Event @event, ScriptAccessory accessory)
+        {
+            if (parse != 5.1) return;
+            var rot = @event["Index"] switch
+            {
+                "00000001" => 0,
+                "00000002" => 1,
+                "00000003" => 2,
+                "00000004" => 3,
+                "00000005" => 4,
+                "00000006" => 5,
+                "00000007" => 6,
+                "00000008" => 7,
+                _ => -1
+            };
+            if (rot == -1) return;
+            var pos = RotatePoint(new(100, 0, 80), new(100, 0, 100), float.Pi / 4 * rot);
+            var dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P5_一运_眼睛激光";
+            dp.Scale = new(16,40);
+            dp.Position = pos;
+            dp.TargetPosition = new(100, 0, 100);
+            dp.Color = accessory.Data.DefaultDangerColor;
+            dp.Delay = 7500;
+            dp.DestoryAt = 12500;
+            accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
+        }
+        
         [ScriptMethod(name: "一运 远线记录", eventType: EventTypeEnum.Tether, eventCondition: ["Id:00C9"], userControl: Debugging)]
         public void P5_Delta_LocalRemoteTetherRecord(Event ev, ScriptAccessory sa)
         {
@@ -2213,6 +2240,46 @@ namespace MyScriptNamespace
             
             _events[4].Reset();
         }
+
+        [ScriptMethod(name: "P5_一运_小电视辅助", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[89])$"], userControl: true)]
+        public async void P5_一运_小电视辅助(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            var myIndex = sa.GetMyIndex();
+            var myPriVal = _pd.Priorities[myIndex];
+            if (myPriVal % 1000 < 100) return;
+            var me = sa.Data.MyObject;
+            if (me == null) return;
+            P5_TV_Support_enable = true;
+            bool? oldState = null;
+            var rot = ev.SourceRotation;
+            if (ev.ActionId == 31638 && _numbers[7] == 1 || ev.ActionId == 31639 && _numbers[7] == 2 )
+            {
+                rot = rot + float.Pi;
+            }
+            while (P5_TV_Support_enable)
+            {
+                await Task.Delay(100);
+                bool state = me.Rotation != rot;
+
+                if (oldState == state)
+                {
+                    // sa.Log.Debug($"面向为{me.Rotation}，保持");
+                }   
+                else
+                {
+                    SetRotation(sa, me, rot);
+                    oldState = state;
+                }
+            }
+        }
+        
+        [ScriptMethod(name: "P5_一运_小电视辅助关闭", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(3163[89])$"], userControl: false)]
+        public async void P5_一运_小电视辅助关闭(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A1_DeltaVersion) return;
+            P5_TV_Support_enable = false;
+        }
         
         [ScriptMethod(name: "一运 绘图删除，准备一传", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31529)$"],
             userControl: Debugging)]
@@ -2252,7 +2319,24 @@ namespace MyScriptNamespace
             // var beetleSwipe = _numbers[8];
             _events[0].Set();
             // (int)RecordedIdx.BeetleSwipeRecorded
-        }        
+        }
+        
+        [ScriptMethod(name: "一传 蟑螂左右刀", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
+            userControl: true)]
+        public void P5_一传_蟑螂左右刀(Event ev, ScriptAccessory sa)
+        {
+            if (_phase != TopPhase.P5A2_DeltaWorld) return;
+            var rot = ev.ActionId == 31636 ? -float.Pi / 2 : float.Pi / 2;
+            var dp = sa.Data.GetDefaultDrawProperties();
+            dp.Name = "P5_一传 蟑螂左右刀";
+            dp.Radian = float.Pi + float.Pi / 6;
+            dp.Scale = new(90);
+            dp.Rotation = rot;
+            dp.Owner = ev.SourceId;
+            dp.Color = sa.Data.DefaultDangerColor;
+            dp.DestoryAt = 10000;
+            sa.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Fan, dp);
+        } 
 
         [ScriptMethod(name: "一传 指路 *", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(3163[67])$"],
             userControl: true)]
@@ -3631,6 +3715,21 @@ namespace MyScriptNamespace
             }
             return null;
         }
+        
+        public static void SetRotation(ScriptAccessory sa, IGameObject? obj, float rotation)
+        {
+            if (obj == null || !obj.IsValid())
+            {
+                sa.Log.Error($"传入的IGameObject不合法。");
+                return;
+            }
+            unsafe
+            {
+                GameObject* charaStruct = (GameObject*)obj.Address;
+                charaStruct->SetRotation(rotation);
+            }
+            sa.Log.Debug($"SetRotation => {obj.Name.TextValue} | {obj} => {rotation}");
+        }
     }
 }
 
@@ -3713,6 +3812,7 @@ public static class EventExtensions
         return JsonConvert.DeserializeObject<Vector3>(@event["EffectPosition"]);
     }
 }
+
 
 #region 计算函数
 public static class DirectionCalc
