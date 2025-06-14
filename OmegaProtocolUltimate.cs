@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.3", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.4", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -93,6 +93,13 @@ namespace MyScriptNamespace
         float P53_4_HW;
         int P5_3_MF = 0;
         private bool P5_TV_Support_enable = false;
+        
+        public int P5_3_MFT = 0; //第几组男女
+        public List<int> MFTransformStates = [0,0,0,0]; // 变身状态列表
+        public List<int> MFPositions = [0,0,0,0];       // 方位列表
+        public int FPos1, FPos2;                    // F的两个方位
+        public int Combo1, Combo2;                  // 组合技类型
+        
         public enum Pattern { Unknown, InOut, OutIn }
         private Pattern _curPattern = Pattern.Unknown;
         private Vector3 MapCenter = new(100.0f, 0.0f, 100.0f);
@@ -2564,6 +2571,7 @@ namespace MyScriptNamespace
                 P52_semaphoreTowersWereConfirmed.Set();
             }
         }
+        
         [ScriptMethod(name: "P5_二运_击退塔指路", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["Operate:Add","DataId:regex:^(2013245|2013246)$"],userControl: true)]
         public void P5_二运_击退塔指路(Event @event, ScriptAccessory accessory)
         {
@@ -2645,7 +2653,6 @@ namespace MyScriptNamespace
             dp2.DestoryAt = 6500;
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp2);
         }
-        
         
         [ScriptMethod(name: "P5_二运_后半", eventType: EventTypeEnum.StatusRemove, eventCondition: ["StatusID:regex:^(3427|3428)$"],userControl: false)]
         public void P5_二运_后半(Event @event, ScriptAccessory accessory)
@@ -3012,6 +3019,218 @@ namespace MyScriptNamespace
                     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
                 }
             }
+        }
+        
+        [ScriptMethod(name: "P5_三运_男女位置技能处理", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:regex:^(15721|15722)$"],userControl: false)]
+        public void P5_三运_男女位置技能处理(Event @event, ScriptAccessory accessory)
+        {
+            if(parse != 5.3) return;
+            if (!ParseObjectId(@event["SourceId"], out var sid)) return;
+            var transformationID = GetTransformationID(sid, accessory);
+            if (transformationID == null) return;
+            P5_3_MFT++;
+            if (@event["SourceDataId"] == "15721")
+            {
+                //男
+                if (@event.SourcePosition.X < 100 && @event.SourcePosition.Z < 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 0 : 2] = 0;
+                }else if (@event.SourcePosition.X < 100 && @event.SourcePosition.Z > 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 0 : 2] = 1;
+                }else if (@event.SourcePosition.X > 100 && @event.SourcePosition.Z > 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 0 : 2] = 2;
+                }else if (@event.SourcePosition.X > 100 && @event.SourcePosition.Z < 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 0 : 2] = 3;
+                }
+                
+                if (transformationID == 0)
+                {
+                    MFTransformStates[P5_3_MFT <= 2 ? 0 : 2] = 0;
+                }
+                if (transformationID == 4)
+                {
+                    MFTransformStates[P5_3_MFT <= 2 ? 0 : 2] = 1;
+                }
+            }
+            if (@event["SourceDataId"] == "15722")
+            {
+                if (@event.SourcePosition.X < 100 && @event.SourcePosition.Z < 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 1 : 3] = 0;
+                }else if (@event.SourcePosition.X < 100 && @event.SourcePosition.Z > 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 1 : 3] = 1;
+                }else if (@event.SourcePosition.X > 100 && @event.SourcePosition.Z > 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 1 : 3] = 2;
+                }else if (@event.SourcePosition.X > 100 && @event.SourcePosition.Z < 100)
+                {
+                    MFPositions[P5_3_MFT <= 2 ? 1 : 3] = 3;
+                }
+                
+                if (transformationID == 0)
+                {
+                    MFTransformStates[P5_3_MFT <= 2 ? 1 : 3] = 0;
+                }
+                if (transformationID == 4)
+                {
+                    MFTransformStates[P5_3_MFT <= 2 ? 1 : 3] = 1;
+                }
+            }
+        }
+        
+        [ScriptMethod(name: "P5_三运_前半指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31643|31644)$"], userControl: true)]
+        public void P5_三运_前半指路(Event @event, ScriptAccessory accessory)
+        {
+            if (parse != 5.3) return;
+            int type = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31463 ? 0 : 1;
+            int type2 = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31463 ? 1 : 0;
+            Combo1 = MFTransformStates[0] + 2 * MFTransformStates[1];
+            Combo2 = MFTransformStates[2] + 2 * MFTransformStates[3];
+            //前后为0，左右为1
+            Vector3 dealpos1 = default;
+            Vector3 dealpos2 = default;
+
+            if (Combo1 == 0 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 1 || Combo1 == 0 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 1)
+            {
+                dealpos1 = new(100, 0, 81); //A远
+            }
+            if (Combo1 == 0 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 0 || Combo1 == 0 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 0)
+            {
+                dealpos1 = new Vector3(119, 0, 100); //B远
+            }
+            if (Combo1 == 0 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 1 || Combo1 == 0 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 1)
+            {
+                dealpos1 = new Vector3(100, 0, 119); //C远
+            }
+            if (Combo1 == 0 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 0 || Combo1 == 0 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 0)
+            {
+                dealpos1 = new Vector3(81, 0, 100); //D远
+            }
+            if (Combo1 == 2 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 1 || Combo1 == 2 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 1 ||
+                Combo1 == 3 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 1 || Combo1 == 3 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 1)
+            {
+                dealpos1 = new Vector3(100, 0, 95.5f); //A近
+            }
+            if (Combo1 == 2 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 0 || Combo1 == 2 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 0 ||
+                Combo1 == 3 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 0 || Combo1 == 3 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 0)
+            {
+                dealpos1 = new Vector3(104.5f, 0, 100); //B近
+            }
+            if (Combo1 == 2 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 1 || Combo1 == 2 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 1 ||
+               Combo1 == 3 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 1 || Combo1 == 3 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 1)
+            {
+                dealpos1 = new Vector3(100, 0, 104.5f); //C近
+            }
+            if (Combo1 == 2 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 0 || Combo1 == 2 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 0 ||
+                Combo1 == 3 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 0 || Combo1 == 3 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 0)
+            {
+                dealpos1 = new Vector3(95.5f, 0, 100); //D近
+            }
+            if (Combo1 == 1 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 1 || Combo1 == 1 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 1)
+            {
+                dealpos1 = new Vector3(100, 0, 88); //A中
+            }
+            if (Combo1 == 1 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 0 || Combo1 == 1 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 0)
+            {
+                dealpos1 = new Vector3(112, 0, 100); //B中
+            }
+            if (Combo1 == 1 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 1 || Combo1 == 1 && MFPositions[0] == 2 && MFPositions[1] == 0 && type == 1)
+            {
+                dealpos1 = new Vector3(100, 0, 112); //C中
+            }
+            if (Combo1 == 1 && MFPositions[0] == 1 && MFPositions[1] == 3 && type == 0 || Combo1 == 1 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 0)
+            {
+                dealpos1 = new Vector3(88, 0, 100); //D中
+            }
+            
+            if (Combo2 == 0 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 1 || Combo2 == 0 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 1)
+            {
+                dealpos2 = new Vector3(100, 0, 81); //A远
+            }
+            if (Combo2 == 0 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 0 || Combo2 == 0 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 0)
+            {
+                dealpos2 = new Vector3(119, 0, 100); //B远
+            }
+            if (Combo2 == 0 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 1 || Combo2 == 0 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 1)
+            {
+                dealpos2 = new Vector3(100, 0, 119); //C远
+            }
+            if (Combo2 == 0 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 0 || Combo2 == 0 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 0)
+            {
+                dealpos2 = new Vector3(81, 0, 100); //D远
+            }
+            if (Combo2 == 2 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 1 || Combo2 == 2 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 1 ||
+                Combo2 == 3 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 1 || Combo2 == 3 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 1)
+            {
+                dealpos2 = new Vector3(100, 0, 95.5f); //A近
+            }
+            if (Combo2 == 2 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 0 || Combo2 == 2 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 0 ||
+                Combo2 == 3 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 0 || Combo2 == 3 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 0)
+            {
+                dealpos2 = new Vector3(104.5f, 0, 100); //B近
+            }
+            if (Combo2 == 2 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 1 || Combo2 == 2 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 1 ||
+               Combo2 == 3 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 1 || Combo2 == 3 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 1)
+            {
+                dealpos2 = new Vector3(100, 0, 104.5f); //C近
+            }
+            if (Combo2 == 2 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 0 || Combo2 == 2 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 0 ||
+                Combo2 == 3 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 0 || Combo2 == 3 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 0)
+            {
+                dealpos2 = new Vector3(95.5f, 0, 100); //D近
+            }
+            if (Combo2 == 1 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 1 || Combo2 == 1 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 1)
+            {
+                dealpos2 = new Vector3(100, 0, 88); //A中
+            }
+            if (Combo2 == 1 && MFPositions[2] == 3 && MFPositions[3] == 1 && type2 == 0 || Combo2 == 1 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 0)
+            {
+                dealpos2 = new Vector3(112, 0, 100); //B中
+            }
+            if (Combo2 == 1 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 1 || Combo2 == 1 && MFPositions[2] == 2 && MFPositions[3] == 0 && type2 == 1)
+            {
+                dealpos2 = new Vector3(100, 0, 112); //C中
+            }
+            if (Combo2 == 1 && MFPositions[2] == 1 && MFPositions[3] == 3 && type2 == 0 || Combo2 == 1 && MFPositions[2] == 0 && MFPositions[3] == 2 && type2 == 0)
+            {
+                dealpos2 = new Vector3(88, 0, 100); //D中
+            }
+            
+            var dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P5_三运_前半指路_1";
+            dp.Scale = new(2);
+            dp.Owner = accessory.Data.Me;
+            dp.TargetPosition = dealpos1;
+            dp.ScaleMode |= ScaleMode.YByDistance;
+            dp.Color = accessory.Data.DefaultSafeColor;
+            dp.DestoryAt = 9000;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            
+            dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P5_三运_前半指路_1-2";
+            dp.Scale = new(2);
+            dp.Position = dealpos1;
+            dp.TargetPosition = dealpos2;
+            dp.ScaleMode |= ScaleMode.YByDistance;
+            dp.Color = accessory.Data.DefaultDangerColor;
+            dp.DestoryAt = 9000;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            
+            dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P5_三运_前半指路_2";
+            dp.Scale = new(2);
+            dp.Owner = accessory.Data.Me;
+            dp.TargetPosition = dealpos2;
+            dp.ScaleMode |= ScaleMode.YByDistance;
+            dp.Color = accessory.Data.DefaultSafeColor;
+            dp.Delay = 9000;
+            dp.DestoryAt = 4000;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+
         }
         
         [ScriptMethod(name: "P5_三运_探测波动炮", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31638|31639)$"], userControl: true)]
