@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.2", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.3", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -87,6 +87,7 @@ namespace MyScriptNamespace
         int[] P52_Towers = new int[16]{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
         Vector3[] P52_TowerPos = new Vector3[16];
         AutoResetEvent P52_semaphoreTowersWereConfirmed = new (false);
+        private byte? P52_F_TransformationID;
         int P52_MarkType;
         int P53_MarkType;
         float P53_4_HW;
@@ -149,6 +150,7 @@ namespace MyScriptNamespace
             ArrowNum = 0;
             CannonNum = 0;
             StepCannonIndex = 0;
+            P5_TV_Support_enable = false;
             P52_OmegaMDir = 0;
             P52_OmegaFDirDone = false;
             P52_OmegaFDir = 0;
@@ -2257,12 +2259,13 @@ namespace MyScriptNamespace
             {
                 rot = rot + float.Pi;
             }
+
+            await Task.Delay(6000);
             while (P5_TV_Support_enable)
             {
                 await Task.Delay(100);
-                bool state = me.Rotation != rot;
-
-                if (oldState == state)
+                bool state = me.Rotation.Equals(rot);
+                if (oldState == state || IsMoving)
                 {
                     // sa.Log.Debug($"面向为{me.Rotation}，保持");
                 }   
@@ -2271,6 +2274,23 @@ namespace MyScriptNamespace
                     SetRotation(sa, me, rot);
                     oldState = state;
                 }
+            }
+        }
+        
+        public static bool IsMoving
+        {
+            get
+            {
+                bool isMoving = false;
+                unsafe
+                {
+                    FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap* ptr = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentMap.Instance();
+                    if (ptr is not null)
+                    {
+                        isMoving = ptr->IsPlayerMoving == 1;
+                    }
+                }
+                return isMoving;
             }
         }
         
@@ -2745,9 +2765,9 @@ namespace MyScriptNamespace
         {
             if (parse != 5.21) return;
             if (!ParseObjectId(@event["SourceId"], out var sid)) return;
-            var transformationID = GetTransformationID(sid, accessory);
-            if (transformationID == null) return;
-            if (transformationID == 4)
+            P52_F_TransformationID = GetTransformationID(sid, accessory);
+            if (P52_F_TransformationID == null) return;
+            if (P52_F_TransformationID == 4)
             {
                 var dp = accessory.Data.GetDefaultDrawProperties();
                 dp.Name = "P5_二运_女辣翅1";
@@ -2794,6 +2814,21 @@ namespace MyScriptNamespace
             }
         }
         
+        [ScriptMethod(name: "P5_二运_二传起跑提示", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31631"], userControl: true)]
+        public void P5_二运_二传起跑提示(Event @event, ScriptAccessory accessory)
+        {
+            accessory.Log.Debug($"P52_F_TransformationID:{P52_F_TransformationID}");
+            if (parse != 5.21) return;
+            if (P52_F_TransformationID == 4)
+            {
+                accessory.Method.TextInfo("等待激光判定后穿入", 3000, true);
+            }
+            else
+            {
+                accessory.Method.TextInfo("等待十字判定后穿入", 5000, true);
+            }
+        }
+        
         [ScriptMethod(name: "P5_二运_二传指路", eventType: EventTypeEnum.TargetIcon, eventCondition: ["Id:regex:^(009C|009D)$"],userControl: true)]
         public void P5_二运_二传指路(Event @event, ScriptAccessory accessory)
         {
@@ -2831,8 +2866,8 @@ namespace MyScriptNamespace
             dp.TargetPosition = dealpos;
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultSafeColor;
-            dp.Delay = 10000;
-            dp.DestoryAt = 9000;
+            dp.Delay = P52_F_TransformationID == 4? 10000 : 13000;
+            dp.DestoryAt = P52_F_TransformationID == 4? 9000 : 7000;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
         
