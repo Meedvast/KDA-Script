@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.4", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.5", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -99,6 +99,7 @@ namespace MyScriptNamespace
         public List<int> MFPositions = [0,0,0,0];       // 方位列表
         public int FPos1, FPos2;                    // F的两个方位
         public int Combo1, Combo2;                  // 组合技类型
+        AutoResetEvent P53_semaphoreMFWereConfirmed = new (false); //确认男女状态收集
         
         public enum Pattern { Unknown, InOut, OutIn }
         private Pattern _curPattern = Pattern.Unknown;
@@ -161,6 +162,7 @@ namespace MyScriptNamespace
             P52_OmegaMDir = 0;
             P52_OmegaFDirDone = false;
             P52_OmegaFDir = 0;
+            P53_semaphoreMFWereConfirmed = new (false);
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
             InitParams();
             _phase = TopPhase.Init;
@@ -3080,20 +3082,26 @@ namespace MyScriptNamespace
                     MFTransformStates[P5_3_MFT <= 2 ? 1 : 3] = 1;
                 }
             }
+            if (P5_3_MFT == 4) P53_semaphoreMFWereConfirmed.Set();
         }
         
         [ScriptMethod(name: "P5_三运_前半指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31643|31644)$"], userControl: true)]
         public void P5_三运_前半指路(Event @event, ScriptAccessory accessory)
         {
             if (parse != 5.3) return;
+            Thread.MemoryBarrier();
+            P53_semaphoreMFWereConfirmed.WaitOne();
+            Thread.MemoryBarrier();
             int type = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31463 ? 0 : 1;
             int type2 = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31463 ? 1 : 0;
             Combo1 = MFTransformStates[0] + 2 * MFTransformStates[1];
             Combo2 = MFTransformStates[2] + 2 * MFTransformStates[3];
+            accessory.Log.Debug($"Combo1: {Combo1}, Combo2: {Combo2}");
+            accessory.Log.Debug($"男1:{MFPositions[0]}  女1:{MFPositions[1]}  男2:{MFPositions[2]}  女2:{MFPositions[3]}");
+            accessory.Log.Debug($"type:{type},type2:{type2}");
             //前后为0，左右为1
             Vector3 dealpos1 = default;
             Vector3 dealpos2 = default;
-
             if (Combo1 == 0 && MFPositions[0] == 3 && MFPositions[1] == 1 && type == 1 || Combo1 == 0 && MFPositions[0] == 0 && MFPositions[1] == 2 && type == 1)
             {
                 dealpos1 = new(100, 0, 81); //A远
