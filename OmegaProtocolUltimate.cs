@@ -2873,7 +2873,7 @@ namespace MyScriptNamespace
             {
                 accessory.Method.TextInfo("等待激光判定后穿入", 3000, true);
             }
-            else if(P52_F_TransformationID == 0)
+            else
             {
                 accessory.Method.TextInfo("等待十字判定后穿入", 5000, true);
             }
