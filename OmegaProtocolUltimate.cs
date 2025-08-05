@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.8", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.9", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -100,7 +100,6 @@ namespace MyScriptNamespace
         public List<int> MFPositions = [0,0,0,0];       // 方位列表
         public int FPos1, FPos2;                    // F的两个方位
         public int Combo1, Combo2;                  // 组合技类型
-        AutoResetEvent P53_semaphoreMFWereConfirmed = new (false); //确认男女状态收集
         
         public enum Pattern { Unknown, InOut, OutIn }
         private Pattern _curPattern = Pattern.Unknown;
@@ -201,7 +200,8 @@ namespace MyScriptNamespace
             P52_OmegaFDirDone = false;
             P52_OmegaFDir = 0;
             P52_OmegaM_Skill = false;
-            P53_semaphoreMFWereConfirmed = new (false);
+			MFTransformStates = [0,0,0,0]; 
+        	MFPositions = [0,0,0,0];
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
             InitParams();
             _phase = TopPhase.Init;
@@ -2924,7 +2924,6 @@ namespace MyScriptNamespace
         public void P5_三运_分P(Event @event, ScriptAccessory accessory)
         {
             parse = 5.3;
-			P53_semaphoreMFWereConfirmed = new System.Threading.AutoResetEvent(false);
         }
         
         [ScriptMethod(name: "P5_三运_扩散波动炮", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31643|31644)$"], userControl: true)]
@@ -3123,16 +3122,12 @@ namespace MyScriptNamespace
                     MFTransformStates[P5_3_MFT <= 2 ? 1 : 3] = 1;
                 }
             }
-            if (P5_3_MFT == 4) P53_semaphoreMFWereConfirmed.Set();
         }
         
         [ScriptMethod(name: "P5_三运_前半指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31643|31644)$"], userControl: true)]
         public void P5_三运_前半指路(Event @event, ScriptAccessory accessory)
         {
             if (parse != 5.3) return;
-            Thread.MemoryBarrier();
-            P53_semaphoreMFWereConfirmed.WaitOne();
-            Thread.MemoryBarrier();
             int type = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31643 ? 0 : 1;
             int type2 = JsonConvert.DeserializeObject<int>(@event["ActionId"]) == 31643 ? 1 : 0;
             Combo1 = MFTransformStates[0] + 2 * MFTransformStates[1];
