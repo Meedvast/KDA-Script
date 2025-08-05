@@ -202,6 +202,7 @@ namespace MyScriptNamespace
             P52_OmegaM_Skill = false;
 			MFTransformStates = [0,0,0,0]; 
         	MFPositions = [0,0,0,0];
+			P5_3_MFT = 0;
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
             InitParams();
             _phase = TopPhase.Init;
@@ -3071,6 +3072,7 @@ namespace MyScriptNamespace
             var transformationID = GetTransformationID(sid, accessory);
             if (transformationID == null) return;
             P5_3_MFT++;
+			accessory.Log.Debug($"P5_3_MFT:{P5_3_MFT}");
             if (@event["SourceDataId"] == "15721")
             {
                 //男
