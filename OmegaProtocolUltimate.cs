@@ -2924,6 +2924,7 @@ namespace MyScriptNamespace
         public void P5_三运_分P(Event @event, ScriptAccessory accessory)
         {
             parse = 5.3;
+			P53_semaphoreMFWereConfirmed = new System.Threading.AutoResetEvent(false);
         }
         
         [ScriptMethod(name: "P5_三运_扩散波动炮", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31643|31644)$"], userControl: true)]
