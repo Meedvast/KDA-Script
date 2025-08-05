@@ -11,10 +11,10 @@
   {
     "Name": "绝欧精装豪华版",
     "Guid": "e0bfb4db-0d38-909f-5088-b23f09b7585e",
-    "Version": "0.0.0.7",
+    "Version": "0.0.0.8",
     "Author": "Karlin",
     "TerritoryIds": [1122],
     "DownloadUrl": "https://raw.githubusercontent.com/Meedvast/KDA-Script/refs/heads/main/OmegaProtocolUltimate.cs",
-    "UpdateInfo": "第1.8版"
+    "UpdateInfo": "第1.9版"
   }
 ]
