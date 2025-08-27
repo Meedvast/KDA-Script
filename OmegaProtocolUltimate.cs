@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.9", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.10", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -654,7 +654,7 @@ namespace MyScriptNamespace
                     dp.Scale = new(60, 20);
                     dp.Owner = sid;
                     dp.Rotation = float.Pi / 2;
-                    dp.Offset = new(-5, 0, 0);
+                    dp.Offset = new(-4, 0, 0);
                     dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
                     dp.DestoryAt = 5500;
                     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
@@ -664,7 +664,7 @@ namespace MyScriptNamespace
                     dp.Scale = new(60, 20);
                     dp.Owner = sid;
                     dp.Rotation = float.Pi / -2;
-                    dp.Offset = new(5, 0, 0);
+                    dp.Offset = new(4, 0, 0);
                     dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
                     dp.DestoryAt = 5500;
                     accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Rect, dp);
@@ -2826,7 +2826,7 @@ namespace MyScriptNamespace
                 dp.Scale = new(60, 20);
                 dp.Owner = sid;
                 dp.Rotation = float.Pi / 2;
-                dp.Offset = new(-5, 0, 0);
+                dp.Offset = new(-4, 0, 0);
                 dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
                 dp.Delay = 12000;
                 dp.DestoryAt = 3000;
@@ -2837,7 +2837,7 @@ namespace MyScriptNamespace
                 dp.Scale = new(60, 20);
                 dp.Owner = sid;
                 dp.Rotation = float.Pi / -2;
-                dp.Offset = new(5, 0, 0);
+                dp.Offset = new(4, 0, 0);
                 dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
                 dp.Delay = 12000;
                 dp.DestoryAt = 3000;
@@ -3044,7 +3044,7 @@ namespace MyScriptNamespace
                     dp.Scale = new(60, 20);
                     dp.Owner = sid;
                     dp.Rotation = float.Pi / 2;
-                    dp.Offset = new(-5, 0, 0);
+                    dp.Offset = new(-4, 0, 0);
                     dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
                     dp.Delay = P5_3_MF < 3 ? 0 : 9000;
                     dp.DestoryAt = P5_3_MF < 3? 13000 : 4000;
@@ -3055,7 +3055,7 @@ namespace MyScriptNamespace
                     dp.Scale = new(60, 20);
                     dp.Owner = sid;
                     dp.Rotation = float.Pi / -2;
-                    dp.Offset = new(5, 0, 0);
+                    dp.Offset = new(4, 0, 0);
                     dp.Color = accessory.Data.DefaultDangerColor.WithW(2);
                     dp.Delay = P5_3_MF < 3 ? 0 : 9000;
                     dp.DestoryAt = P5_3_MF < 3? 13000 : 4000;
