@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.10", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.11", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -2519,6 +2519,7 @@ namespace MyScriptNamespace
         public void P5_二运_分P(Event @event, ScriptAccessory accessory)
         {
             parse = 5.2;
+            accessory.Log.Debug($"--- parse 更改为 {parse}");
             _phase = TopPhase.P5B1_SigmaVersion;
             InitParams();
             _pd.Init(accessory, "P5二运");
@@ -2696,11 +2697,12 @@ namespace MyScriptNamespace
             accessory.Method.SendDraw(DrawModeEnum.Default, DrawTypeEnum.Displacement, dp2);
         }
         
-        [ScriptMethod(name: "P5_二运_后半", eventType: EventTypeEnum.StatusRemove, eventCondition: ["StatusID:regex:^(3427|3428)$"],userControl: false)]
+        [ScriptMethod(name: "P5_二运_后半", eventType: EventTypeEnum.ActionEffect, eventCondition: ["ActionId:regex:^(31555)$"],userControl: false)]
         public void P5_二运_后半(Event @event, ScriptAccessory accessory)
         {
             if (parse != 5.2) return;
             parse = 5.21;
+            accessory.Log.Debug($"--- parse 更改为 {parse}");
         }
         
         [ScriptMethod(name: "P5_二三四传头标记录", eventType: EventTypeEnum.Marker, eventCondition: ["Operate:Add", "Id:regex:^(0[1-46-7]|09|10)$"], userControl: false)]
@@ -2721,6 +2723,7 @@ namespace MyScriptNamespace
                 "09" => 7, //禁止1
                 "10" => 8, //禁止2
             };
+            accessory.Log.Debug($"--- 玩家头标被更新于 {parse}, 为 {P52_MarkType}");
         }
         
         [ScriptMethod(name: "P5_二运_女人位置", eventType: EventTypeEnum.PlayActionTimeline, eventCondition: ["Id:7747", "SourceDataId:15720"], userControl: false)]
@@ -2819,6 +2822,7 @@ namespace MyScriptNamespace
             P52_OmegaM_Skill = true;
             accessory.Log.Debug($"P52_F_TransformationID:{P52_F_TransformationID}");
             if (P52_F_TransformationID == null) return;
+            accessory.Log.Debug($"--- 进入了P5_二运_女人技能");
             if (P52_F_TransformationID == 4)
             {
                 var dp = accessory.Data.GetDefaultDrawProperties();
@@ -3212,6 +3216,7 @@ namespace MyScriptNamespace
                 8 => RotatePoint(new Vector3(109.2f, 0f, 90.8f), new Vector3(100, 0, 100), float.Pi / 4 * dir)
             };
             
+            accessory.Log.Debug($"绘制三传指路 向 {dealpos}");
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P5_三运_三传";
             dp.Scale = new(2);
@@ -3228,7 +3233,7 @@ namespace MyScriptNamespace
         [ScriptMethod(name: "P5_三运_四传指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:32374"], userControl: true)]
         public void P5_三运_四传(Event @event, ScriptAccessory accessory)
         {
-            Task.Delay(1000).Wait();
+            Task.Delay(2500).Wait();
             if (parse != 5.4) return;
             var dealpos = P52_MarkType switch
             {
@@ -3241,7 +3246,7 @@ namespace MyScriptNamespace
                 7 => RotatePoint(new Vector3(89.7f, 0f, 83.5f), new Vector3(100, 0, 100), float.Pi / 4 * P53_4_HW),
                 8 => RotatePoint(new Vector3(110.3f, 0f, 83.5f), new Vector3(100, 0, 100), float.Pi / 4 * P53_4_HW)
             };
-            
+            accessory.Log.Debug($"绘制四传指路 向 {dealpos}");
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P5_三运_四传";
             dp.Scale = new(2);
@@ -3249,7 +3254,7 @@ namespace MyScriptNamespace
             dp.TargetPosition = dealpos;
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultSafeColor;
-            dp.DestoryAt = 10000;
+            dp.DestoryAt = 8500;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
         }
         
@@ -3259,6 +3264,7 @@ namespace MyScriptNamespace
             if (parse != 5.3) return;
             var pos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
             P53_4_HW = RoundPositionTo8Dir(pos, new(100, 0, 100));
+            accessory.Log.Debug($"四传基准方位为 {P53_4_HW}");
         }
         #endregion
 
