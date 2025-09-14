@@ -27,7 +27,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.11", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.12", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -1766,8 +1766,8 @@ namespace MyScriptNamespace
                 var sourceIdx = sa.GetPlayerIdIndex((uint)sourceId);
 
                 var pdValMax = _pd.SelectSpecificPriorityIndex(0, true).Value;
-                _pd.AddPriority(targetIdx, pdValMax > 1000 ? 2000 : 1000);
-                _pd.AddPriority(sourceIdx, pdValMax > 1000 ? 2000 : 1000);
+                _pd.AddPriority(targetIdx, pdValMax >= 1000 ? 2000 : 1000);
+                _pd.AddPriority(sourceIdx, pdValMax >= 1000 ? 2000 : 1000);
                 _events[2].Set();   // 远线搭档记录完毕
             }
         }
@@ -1829,13 +1829,13 @@ namespace MyScriptNamespace
             
             var myIndex = sa.GetMyIndex();
             var myPdVal = _pd.Priorities[myIndex];
-            if (myPdVal > 1000 & myPdVal.GetDecimalDigit(3) == 0)
+            if (myPdVal >= 1000 & myPdVal.GetDecimalDigit(3) == 0)
             {
                 // 玩家需找到锁链1/锁链2搭档
                 // 锁链1的搭档，千位相同，百位为1。锁链2的搭档，千位相同，百位为2。
                 // 若myPdVal的千位为1，则自身为降序第4，找降序第3(index 2)为搭档
                 // 若myPdVal的千位为2，则自身为降序第2，找降序第1(index 0)为搭档
-                var myPartner = _pd.SelectSpecificPriorityIndex(myPdVal > 2000 ? 0 : 2, true);
+                var myPartner = _pd.SelectSpecificPriorityIndex(myPdVal >= 2000 ? 0 : 2, true);
                 sa.Log.Debug($"玩家远线无世界，找到远线搭档为 {sa.GetPlayerJobByIndex(myPartner.Key)}");
                 _pd.AddPriority(myIndex, myPartner.Value.GetDecimalDigit(3) * 100 + 10);  // 增加百位+10，如，对方是锁链2，则玩家+210
                 sa.Log.Debug($"{_pd.ShowPriorities()}");
