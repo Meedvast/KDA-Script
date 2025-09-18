@@ -9,7 +9,6 @@ using KodakkuAssist.Data;
 using System.Threading;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using ECommons;
 using System.Numerics;
 using Newtonsoft.Json;
 using System.Linq;
@@ -18,8 +17,6 @@ using System.Xml.Linq;
 using Dalamud.Utility.Numerics;
 // using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Plugin.Services;
-using ECommons.GameFunctions;
-using ECommons.MathHelpers;
 using KodakkuAssist.Module.GameOperate;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
@@ -27,7 +24,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.12", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.13", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -35,6 +32,11 @@ namespace MyScriptNamespace
         欧米茄验证绝境战(基于K佬原有脚本添加P5二三运，P6指路)
         感谢Usami提供的P5一运指路
         """;
+        
+        private const string UpdateInfo =
+            """
+            1. 适配鸭鸭0.5.x.x
+            """;
 
         [UserSetting("P3_开场排队顺序")]
         public P3SortEnum P3_StackSort { get; set; }
@@ -4020,6 +4022,9 @@ public static class EventExtensions
 #region 计算函数
 public static class DirectionCalc
 {
+    public static float DegToRad(this float deg) => (deg + 360f) % 360f / 180f * float.Pi;
+    public static float RadToDeg(this float rad) => (rad + 2 * float.Pi) % (2 * float.Pi) / float.Pi * 180f;
+    
     // 以北为0建立list
     // Game         List    Logic
     // 0            - 4     pi
