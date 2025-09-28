@@ -24,7 +24,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.13", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.14", author:"Karlin",note: noteStr)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -35,7 +35,7 @@ namespace MyScriptNamespace
         
         private const string UpdateInfo =
             """
-            1. 适配鸭鸭0.5.x.x
+            1. 添加P5三传指路出现延时。
             """;
 
         [UserSetting("P3_开场排队顺序")]
@@ -3203,6 +3203,7 @@ namespace MyScriptNamespace
         [ScriptMethod(name: "P5_三运_三传指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:regex:^(31638|31639)$"], userControl: true)]
         public void P5_三运_三传(Event @event, ScriptAccessory accessory)
         {
+            Task.Delay(1500).Wait();
             if (parse != 5.3) return;
             int dir = @event["ActionId"] == "31638" ? 2 : -2;
 
@@ -3226,7 +3227,7 @@ namespace MyScriptNamespace
             dp.TargetPosition = dealpos;
             dp.ScaleMode |= ScaleMode.YByDistance;
             dp.Color = accessory.Data.DefaultSafeColor;
-            dp.DestoryAt = 10000;
+            dp.DestoryAt = 8500;
             accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
 
             parse = 5.4;
