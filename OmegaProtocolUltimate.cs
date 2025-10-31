@@ -24,7 +24,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.14", author:"Karlin",note: noteStr)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.15", author:"Karlin",note: noteStr,updateInfo: UpdateInfo)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -35,7 +35,7 @@ namespace MyScriptNamespace
         
         private const string UpdateInfo =
             """
-            1. 添加P5三传指路出现延时。
+            1. 修复P5二运踩塔指路错误。
             """;
 
         [UserSetting("P3_开场排队顺序")]
@@ -2529,11 +2529,12 @@ namespace MyScriptNamespace
         }
         
         [ScriptMethod(name: "P5_二运_男人位置", eventType: EventTypeEnum.AddCombatant, eventCondition: ["DataId:15724"],userControl: false)]
-        public void P5_二运_男人位置(Event @event, ScriptAccessory accessory)
+        public void P5_二运_男人位置(Event @event, ScriptAccessory sa)
         {
             if (parse != 5.2) return;
             var pos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
             P52_OmegaMDir = (RoundPositionTo8Dir(pos, new(100, 0, 100))+4)%8;
+            sa.Log.Debug($"P5二运 男人方位：{P52_OmegaMDir}");
             
         }
         
@@ -2551,7 +2552,7 @@ namespace MyScriptNamespace
             if (parse != 5.2) return;
             if (!ParseObjectId(@event["TargetId"], out var tid)) return;
             if (accessory.Data.PartyList.IndexOf(tid) != accessory.Data.PartyList.IndexOf(accessory.Data.Me)) return;
-            
+            accessory.Log.Debug($"P5二运 玩家头标：{@event["Id"]}");
             P52_Self_Pos = @event["Id"] switch
             {
                 "01" => P5_SigmaBuffIsFar
@@ -2592,7 +2593,7 @@ namespace MyScriptNamespace
         }
         
         [ScriptMethod(name: "P5_二运_塔位置", eventType: EventTypeEnum.ObjectChanged, eventCondition: ["Operate:Add", "DataId:regex:^(2013245|2013246)$"],userControl: false)]
-        public void P5_二运_塔位置(Event @event, ScriptAccessory accessory)
+        public void P5_二运_塔位置(Event @event, ScriptAccessory sa)
         {
             if (parse != 5.2) return;
             var pos = JsonConvert.DeserializeObject<Vector3>(@event["SourcePosition"]);
@@ -2605,14 +2606,16 @@ namespace MyScriptNamespace
             {
                 P52_Towers[dir] = 2;
             }
-
+            sa.Log.Debug($"P5二运 塔方位 {dir} 为 {P52_Towers[dir]} 人塔");
             int count = P52_Towers.Count(x => x != 0);
             if (count == 6 && !P5_SigmaBuffIsFar)
             {
+                sa.Log.Debug($"P5二运 场上找到了 {count} 座塔");
                 P52_semaphoreTowersWereConfirmed.Set();
             }
             else if(count == 5 && P5_SigmaBuffIsFar)
             {
+                sa.Log.Debug($"P5二运 场上找到了 {count} 座塔");
                 P52_semaphoreTowersWereConfirmed.Set();
             }
         }
@@ -2625,7 +2628,8 @@ namespace MyScriptNamespace
             P52_semaphoreTowersWereConfirmed.WaitOne();
             Thread.MemoryBarrier();
             P52_Self_Dir = RoundPositionTo16Dir(P52_Self_Pos, new(100, 0, 100));
-
+            accessory.Log.Debug($"P5二运击退塔前 玩家所在八方方位 {P52_Self_Dir}");
+            
             int tempCwDirIndex;
             int tempCcwDirIndex;
             int tempSide = 0;
@@ -2634,21 +2638,28 @@ namespace MyScriptNamespace
 
             if (P5_SigmaBuffIsFar)
             {
+                accessory.Log.Debug($"是 远Buff");
                 tempCwDirIndex = (P52_Self_Dir + 15) % 16;
                 tempCcwDirIndex = (P52_Self_Dir + 1) % 16;
             }
             else
             {
+                accessory.Log.Debug($"是 近Buff");
                 tempCwDirIndex = (P52_Self_Dir + 14) % 16;
                 tempCcwDirIndex = (P52_Self_Dir + 2) % 16;
             }
 
+            accessory.Log.Debug($"即将对（{tempCwDirIndex}与{tempCcwDirIndex}），进行检查");
+            accessory.Log.Debug($"CWDir：{P52_Towers[tempCwDirIndex]}，CCWDir：{P52_Towers[tempCcwDirIndex]}");
+            
             if (P52_Towers[tempCwDirIndex] == 2)
             {
+                accessory.Log.Debug($"面向塔，逆时针方向（{tempCwDirIndex}），存在双人塔！");
                 tempSide = 1;
             }
             else if (P52_Towers[tempCcwDirIndex] == 2)
             {
+                accessory.Log.Debug($"面向塔，顺时针方向（{tempCcwDirIndex}），存在双人塔");
                 tempSide = 2;
             }
             else
@@ -2658,15 +2669,17 @@ namespace MyScriptNamespace
 
                 if (cwIsSingle && ccwIsNotDouble)
                 {
+                    accessory.Log.Debug($"面向塔，逆时针方向（{tempCwDirIndex}），仅存在单人塔");
                     tempSide = 1;
                 }
                 else
                 {
-                    bool ccwIsSingle = P52_Towers[tempCwDirIndex] == 1;
-                    bool cwIsNotDouble = P52_Towers[tempCcwDirIndex] != 2;
+                    bool ccwIsSingle = P52_Towers[tempCcwDirIndex] == 1;
+                    bool cwIsNotDouble = P52_Towers[tempCwDirIndex] != 2;
 
                     if (ccwIsSingle && cwIsNotDouble)
                     {
+                        accessory.Log.Debug($"面向塔，顺时针方向（{tempCcwDirIndex}），仅存在单人塔");
                         tempSide = 2;
                     }
                 }
@@ -2676,6 +2689,16 @@ namespace MyScriptNamespace
             {
                 targetIndex = tempSide == 1 ? tempCwDirIndex : tempCcwDirIndex;
             }
+
+            var str = "Towers: [";
+            for (int i = 0; i < P52_Towers.Length; i++)
+            {
+                str += $"{P52_Towers[i]}, ";
+            }
+            str += "]";
+            accessory.Log.Debug($"{str}");
+            
+            accessory.Log.Debug($"目标塔为：{targetIndex}");
             
             var dp1 = accessory.Data.GetDefaultDrawProperties();
             dp1.Name = "P52_击退指路起点";
