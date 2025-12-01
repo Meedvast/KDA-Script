@@ -3318,8 +3318,6 @@ namespace MyScriptNamespace
             // 模式判断
             if (Math.Abs(offset.X) < 5) // 中央垂直线
             {
-                GenerateLine(accessory, casterPos, new Vector2(1, 0), 4, InOut);
-                GenerateLine(accessory, casterPos, new Vector2(-1, 0), 4, InOut);
                 if (!isSet)
                 {
                     arrowMode = 0;
@@ -3330,8 +3328,6 @@ namespace MyScriptNamespace
             }
             else if (Math.Abs(offset.Z) < 5) // 中央水平线
             {
-                GenerateLine(accessory, casterPos, new Vector2(0, 1), 4, InOut);
-                GenerateLine(accessory, casterPos, new Vector2(0, -1), 4, InOut);
                 if (!isSet)
                 {
                     arrowMode = 0;
@@ -3342,7 +3338,6 @@ namespace MyScriptNamespace
             }
             else if (Math.Abs(offset.X) < 18) // 侧边垂直线
             {
-                GenerateLine(accessory, casterPos, new Vector2(offset.X < 0 ? 1 : -1, 0), 7, OutIn);
                 if (!isSet)
                 {
                     arrowMode = 1;
@@ -3353,7 +3348,6 @@ namespace MyScriptNamespace
             }
             else if (Math.Abs(offset.Z) < 18) // 侧边水平线
             {
-                GenerateLine(accessory, casterPos, new Vector2(0, offset.Z < 0 ? 1 : -1), 7, OutIn);
                 if (!isSet)
                 {
                     arrowMode = 1;
@@ -3361,6 +3355,33 @@ namespace MyScriptNamespace
 				    System.Threading.Thread.MemoryBarrier();
 				    ArrowModeConfirmed.Set();
                 }
+            }
+        }
+
+		[ScriptMethod(name: "宇宙天箭绘制", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31651"], userControl: true)]
+        public void 宇宙天箭绘制(Event @event, ScriptAccessory accessory)
+        {
+            var casterPos = @event.SourcePosition();
+            var center = MapCenter;
+            var offset = casterPos - center;
+            // 模式判断
+            if (Math.Abs(offset.X) < 5) // 中央垂直线
+            {
+                GenerateLine(accessory, casterPos, new Vector2(1, 0), 4, InOut);
+                GenerateLine(accessory, casterPos, new Vector2(-1, 0), 4, InOut);
+            }
+            else if (Math.Abs(offset.Z) < 5) // 中央水平线
+            {
+                GenerateLine(accessory, casterPos, new Vector2(0, 1), 4, InOut);
+                GenerateLine(accessory, casterPos, new Vector2(0, -1), 4, InOut);
+            }
+            else if (Math.Abs(offset.X) < 18) // 侧边垂直线
+            {
+                GenerateLine(accessory, casterPos, new Vector2(offset.X < 0 ? 1 : -1, 0), 7, OutIn);
+            }
+            else if (Math.Abs(offset.Z) < 18) // 侧边水平线
+            {
+                GenerateLine(accessory, casterPos, new Vector2(0, offset.Z < 0 ? 1 : -1), 7, OutIn);
             }
         }
 
