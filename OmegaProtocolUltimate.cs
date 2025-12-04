@@ -24,7 +24,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.16", author:"Karlin",note: noteStr,updateInfo: UpdateInfo)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.17", author:"Karlin",note: noteStr,updateInfo: UpdateInfo)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -197,6 +197,7 @@ namespace MyScriptNamespace
             ArrowNum = 0;
             CannonNum = 0;
             StepCannonIndex = 0;
+			StepCannon = new Vector3[4];
             P5_TV_Support_enable = false;
             P52_OmegaMDir = 0;
             P52_OmegaFDirDone = false;
@@ -204,6 +205,7 @@ namespace MyScriptNamespace
             P52_OmegaM_Skill = false;
 			MFTransformStates = [0,0,0,0]; 
         	MFPositions = [0,0,0,0];
+			Array.Clear(P52_Towers, 0, P52_Towers.Length);
 			P5_3_MFT = 0;
             ArrowModeConfirmed = new System.Threading.AutoResetEvent(false);
             InitParams();
@@ -3638,6 +3640,7 @@ namespace MyScriptNamespace
         [ScriptMethod(name: "地火8方指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31663"], userControl: true)]
         public void 地火计数(Event @event, ScriptAccessory accessory)
         {
+			if (parse != 6) return;
             CannonNum++;
             if (CannonNum == 48)
             {
@@ -3670,6 +3673,7 @@ namespace MyScriptNamespace
         [ScriptMethod(name: "步进式地火计数", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31661"], userControl: false)]
         public void 步进式地火计数(Event @event, ScriptAccessory accessory)
         {
+			if (parse != 6) return;
             var pos = @event.SourcePosition();
             StepCannon[(StepCannonIndex++)%4] = pos;
         }
@@ -3686,7 +3690,8 @@ namespace MyScriptNamespace
             var c1e = new Vector3((c1.X - 100) / 24 * 18 + 100, 0, (c1.Z - 100) / 24 * 18 + 100);
             
             var end = RotatePointFromCentre(c1e, MapCenter, a*-1.5f);
-            
+			if (a < 0) accessory.Method.TextInfo($"面朝场外向左", 8000, true);
+            if (a > 0) accessory.Method.TextInfo($"面朝场外向右", 8000, true);
             var dp = accessory.Data.GetDefaultDrawProperties();
             dp.Name = "P6地火起跑位置";
             dp.Scale = new(2);
