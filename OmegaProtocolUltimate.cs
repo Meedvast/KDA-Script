@@ -24,7 +24,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.Object;
 namespace MyScriptNamespace
 {
     
-    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.18", author:"Karlin",note: noteStr,updateInfo: UpdateInfo)]
+    [ScriptType(name: "绝欧精装豪华版", territorys: [1122],guid: "e0bfb4db-0d38-909f-5088-b23f09b7585e", version:"0.0.0.19", author:"Karlin",note: noteStr,updateInfo: UpdateInfo)]
     public class OmegaProtocolUltimate
     {
         const string noteStr =
@@ -35,7 +35,7 @@ namespace MyScriptNamespace
         
         private const string UpdateInfo =
             """
-            1. 修复P5二运踩塔指路错误。
+            1. 尝试修复P6地火波动炮指路问题。
             """;
 
         [UserSetting("P3_开场排队顺序")]
@@ -107,7 +107,8 @@ namespace MyScriptNamespace
         private Pattern _curPattern = Pattern.Unknown;
         private Vector3 MapCenter = new(100.0f, 0.0f, 100.0f);
         private int ArrowNum = 0;
-        private int CannonNum = 0;
+        // private int CannonNum = 0;
+        private bool CannonCasted = false;
 		private readonly object CannonNumLock = new object();
         public Vector3[] StepCannon = new Vector3[4];
         public int StepCannonIndex = 0;
@@ -196,7 +197,8 @@ namespace MyScriptNamespace
             parse = 0;
             arrowMode = -1;
             ArrowNum = 0;
-            CannonNum = 0;
+            // CannonNum = 0;
+            CannonCasted = false;
             StepCannonIndex = 0;
 			StepCannon = new Vector3[4];
             P5_TV_Support_enable = false;
@@ -3638,40 +3640,44 @@ namespace MyScriptNamespace
 
         }
         
-        [ScriptMethod(name: "地火8方指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31663"], userControl: true)]
+        // [ScriptMethod(name: "地火8方指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31663"], userControl: true)]
+        [ScriptMethod(name: "地火8方指路", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31657"], userControl: true)]
         public void 地火计数(Event @event, ScriptAccessory accessory)
         {
 			if (parse != 6) return;
-			lock (CannonNumLock)
-			{
-				if (CannonNum < 48) CannonNum++;
-				if (CannonNum == 48)
-            	{
-                	var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
-                	var pos = myindex switch
-                	{
-                    	0 => new Vector3(99.97f, -0.00f, 86.97f),
-                    	1 => new Vector3(113.15f, -0.00f, 100.07f),
-                    	2 => new Vector3(86.91f, 0.00f, 100.03f),
-                    	3 => new Vector3(100.04f, -0.00f, 112.89f),
-                    	4 => new Vector3(90.66f, -0.00f, 109.15f),
-                    	5 => new Vector3(109.40f, -0.00f, 109.29f),
-                    	6 => new Vector3(90.67f, 0.00f, 90.78f),
-                    	7 => new Vector3(109.47f, 0.00f, 90.83f),
-                    	_ => default
-                	};
-                
-                	var dp = accessory.Data.GetDefaultDrawProperties();
-                	dp.Name = "P6一地火8方";
-                	dp.Scale = new(2);
-                	dp.Owner = accessory.Data.Me;
-                	dp.TargetPosition = pos;
-                	dp.ScaleMode |= ScaleMode.YByDistance;
-                	dp.Color = accessory.Data.DefaultSafeColor;
-                	dp.DestoryAt = 8000;
-                	accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
-            	}
-			} 
+            
+            if (CannonCasted) return;
+            CannonCasted = true;
+			// lock (CannonNumLock)
+			// {
+			// 	if (CannonNum < 48) CannonNum++;
+			// 	if (CannonNum == 48)
+            // {
+            var myindex = accessory.Data.PartyList.IndexOf(accessory.Data.Me);
+            var pos = myindex switch
+            {
+                0 => new Vector3(99.97f, -0.00f, 86.97f),
+                1 => new Vector3(113.15f, -0.00f, 100.07f),
+                2 => new Vector3(86.91f, 0.00f, 100.03f),
+                3 => new Vector3(100.04f, -0.00f, 112.89f),
+                4 => new Vector3(90.66f, -0.00f, 109.15f),
+                5 => new Vector3(109.40f, -0.00f, 109.29f),
+                6 => new Vector3(90.67f, 0.00f, 90.78f),
+                7 => new Vector3(109.47f, 0.00f, 90.83f),
+                _ => default
+            };
+        
+            var dp = accessory.Data.GetDefaultDrawProperties();
+            dp.Name = "P6一地火8方";
+            dp.Scale = new(2);
+            dp.Owner = accessory.Data.Me;
+            dp.TargetPosition = pos;
+            dp.ScaleMode |= ScaleMode.YByDistance;
+            dp.Color = accessory.Data.DefaultSafeColor;
+            dp.DestoryAt = 7000;
+            accessory.Method.SendDraw(DrawModeEnum.Imgui, DrawTypeEnum.Displacement, dp);
+            // }
+			// } 
         }
         
         [ScriptMethod(name: "步进式地火计数", eventType: EventTypeEnum.StartCasting, eventCondition: ["ActionId:31661"], userControl: false)]
